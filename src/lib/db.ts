@@ -127,8 +127,12 @@ export interface DatabaseSchema {
   membershipRequests: MembershipRequest[];
 }
 
-const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
-const dbPath = isVercel ? path.join('/tmp', 'db.json') : path.join(process.cwd(), 'data', 'db.json');
+declare global {
+  var _cachedDb: DatabaseSchema | undefined;
+}
+
+const primaryDbPath = path.join(process.cwd(), 'data', 'db.json');
+const tmpDbPath = path.join('/tmp', 'db.json');
 
 const SUPER_ADMIN_EMAIL = 'luhurenbaiclub@gmail.com';
 
@@ -162,39 +166,92 @@ const initialData: DatabaseSchema = {
 };
 
 export function getDb(): DatabaseSchema {
-  try {
-    if (!fs.existsSync(path.dirname(dbPath))) {
-      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-    }
-    if (!fs.existsSync(dbPath)) {
-      fs.writeFileSync(dbPath, JSON.stringify(initialData, null, 2));
-      return initialData;
-    }
-    const raw = fs.readFileSync(dbPath, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (!parsed.settings) parsed.settings = defaultSettings;
-    if (!parsed.settings.areaOptions || !Array.isArray(parsed.settings.areaOptions)) {
-      parsed.settings.areaOptions = defaultSettings.areaOptions;
-    }
-    if (!parsed.roleAssignments) parsed.roleAssignments = initialData.roleAssignments;
-    if (!parsed.notifications) parsed.notifications = [];
-    if (!parsed.programmes) parsed.programmes = [];
-    if (!parsed.membershipRequests) parsed.membershipRequests = [];
-    return parsed;
-  } catch (err) {
-    console.error('getDb filesystem error:', err);
-    return initialData;
+  // 1. Return in-memory cached DB if already loaded in process
+  if (global._cachedDb) {
+    return global._cachedDb;
   }
+
+  let dbData: DatabaseSchema | null = null;
+
+  // 2. Try loading from /tmp/db.json (if written previously in this lambda environment)
+  if (fs.existsSync(tmpDbPath)) {
+    try {
+      const raw = fs.readFileSync(tmpDbPath, 'utf8');
+      dbData = JSON.parse(raw);
+    } catch (err) {
+      console.error('Error reading /tmp/db.json:', err);
+    }
+  }
+
+  // 3. If not in /tmp, load from primary persistent seed file data/db.json
+  if (!dbData && fs.existsSync(primaryDbPath)) {
+    try {
+      const raw = fs.readFileSync(primaryDbPath, 'utf8');
+      dbData = JSON.parse(raw);
+    } catch (err) {
+      console.error('Error reading data/db.json:', err);
+    }
+  }
+
+  // 4. Fallback to initialData if neither file exists
+  if (!dbData) {
+    dbData = initialData;
+  }
+
+  // Ensure default structures are populated
+  if (!dbData.settings) dbData.settings = defaultSettings;
+  if (!dbData.settings.areaOptions || !Array.isArray(dbData.settings.areaOptions)) {
+    dbData.settings.areaOptions = defaultSettings.areaOptions;
+  }
+  if (!dbData.users) dbData.users = initialData.users;
+  if (!dbData.roleAssignments) dbData.roleAssignments = initialData.roleAssignments;
+  if (!dbData.contributions) dbData.contributions = [];
+  if (!dbData.notifications) dbData.notifications = [];
+  if (!dbData.handovers) dbData.handovers = [];
+  if (!dbData.expenses) dbData.expenses = [];
+  if (!dbData.programmes) dbData.programmes = [];
+  if (!dbData.membershipRequests) dbData.membershipRequests = [];
+
+  // Cache in process memory
+  global._cachedDb = dbData;
+
+  // Sync to /tmp for subsequent reads
+  try {
+    if (!fs.existsSync(path.dirname(tmpDbPath))) {
+      fs.mkdirSync(path.dirname(tmpDbPath), { recursive: true });
+    }
+    fs.writeFileSync(tmpDbPath, JSON.stringify(dbData, null, 2));
+  } catch (e) {
+    // Ignore error
+  }
+
+  return dbData;
 }
 
 export function saveDb(data: DatabaseSchema) {
+  // Update in-memory cache
+  global._cachedDb = data;
+
+  const jsonStr = JSON.stringify(data, null, 2);
+
+  // Write to /tmp/db.json
   try {
-    if (!fs.existsSync(path.dirname(dbPath))) {
-      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+    if (!fs.existsSync(path.dirname(tmpDbPath))) {
+      fs.mkdirSync(path.dirname(tmpDbPath), { recursive: true });
     }
-    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
+    fs.writeFileSync(tmpDbPath, jsonStr);
   } catch (err) {
-    console.error('saveDb filesystem error:', err);
+    console.error('saveDb /tmp write error:', err);
+  }
+
+  // Also write to workspace data/db.json if writable
+  try {
+    if (!fs.existsSync(path.dirname(primaryDbPath))) {
+      fs.mkdirSync(path.dirname(primaryDbPath), { recursive: true });
+    }
+    fs.writeFileSync(primaryDbPath, jsonStr);
+  } catch (err) {
+    // Silently catch on read-only serverless filesystem
   }
 }
 
