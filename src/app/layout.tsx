@@ -46,7 +46,7 @@ export default function RootLayout({
             </div>
           </header>
 
-          <main className="max-w-md mx-auto px-4 py-4 space-y-4">
+          <main className="max-w-md md:max-w-4xl lg:max-w-6xl mx-auto px-4 py-4 space-y-4">
             {children}
           </main>
         </NextAuthProvider>

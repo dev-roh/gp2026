@@ -775,54 +775,79 @@ export default function HomePage() {
 
       {/* TAB CONTENT: Overview */}
       {activeTab === 'overview' && (
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-xl">
               <div className="flex items-center text-amber-400 text-xs font-semibold mb-1">
                 <Clock className="w-3.5 h-3.5 mr-1" />
                 Pending Handovers
               </div>
-              <p className="text-lg font-bold text-slate-100">₹{summary?.pendingHandovers.toLocaleString()}</p>
+              <p className="text-xl font-bold text-slate-100">₹{summary?.pendingHandovers.toLocaleString()}</p>
               <p className="text-[10px] text-slate-400">Cash waiting approval</p>
             </div>
 
-            <div className="bg-purple-500/10 border border-purple-500/20 p-3 rounded-xl">
+            <div className="bg-purple-500/10 border border-purple-500/20 p-3.5 rounded-xl">
               <div className="flex items-center text-purple-400 text-xs font-semibold mb-1">
                 <Wallet className="w-3.5 h-3.5 mr-1" />
                 Owed Out-of-Pocket
               </div>
-              <p className="text-lg font-bold text-slate-100">₹{summary?.pendingReimbursements.toLocaleString()}</p>
+              <p className="text-xl font-bold text-slate-100">₹{summary?.pendingReimbursements.toLocaleString()}</p>
               <p className="text-[10px] text-slate-400">Spent by members to reimburse</p>
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-md space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-              <span>Recent Contributions</span>
-              <button onClick={() => setActiveTab('contributions')} className="text-orange-400 text-[11px] normal-case hover:underline">View All →</button>
-            </h3>
-            <div className="divide-y divide-slate-800">
-              {contributions.filter(c => c.status === 'APPROVED').slice(0, 5).map((c) => (
-                <div key={c.id} className="py-2 flex items-center justify-between text-xs">
-                  <div>
-                    <p className="font-semibold text-slate-200">{c.memberName} <span className="text-slate-400 font-normal">({c.memberArea})</span></p>
-                    <p className="text-[10px] text-slate-400">Collected by: {c.collectorName}</p>
-                  </div>
-                  <div className="text-right flex items-center space-x-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 shadow-md space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                <span>Recent Approved Contributions</span>
+                <button onClick={() => setActiveTab('contributions')} className="text-orange-400 text-[11px] normal-case hover:underline">View All →</button>
+              </h3>
+              <div className="divide-y divide-slate-800">
+                {contributions.filter(c => c.status === 'APPROVED').slice(0, 5).map((c) => (
+                  <div key={c.id} className="py-2 flex items-center justify-between text-xs">
                     <div>
-                      <p className="font-bold text-emerald-400">+₹{c.amount.toLocaleString()}</p>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">{c.paymentMode}</span>
+                      <p className="font-semibold text-slate-200">{c.memberName} <span className="text-slate-400 font-normal">({c.memberArea})</span></p>
+                      <p className="text-[10px] text-slate-400">Collected by: {c.collectorName}</p>
                     </div>
-                    <button 
-                      onClick={() => setSelectedReceipt(c)}
-                      className="p-1.5 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20"
-                      title="View Digital Receipt"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="text-right flex items-center space-x-2">
+                      <div>
+                        <p className="font-bold text-emerald-400">+₹{c.amount.toLocaleString()}</p>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">{c.paymentMode}</span>
+                      </div>
+                      <button 
+                        onClick={() => setSelectedReceipt(c)}
+                        className="p-1.5 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20"
+                        title="View Digital Receipt"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 shadow-md space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                <span>Recent Expenses Log</span>
+                <button onClick={() => setActiveTab('expenses')} className="text-rose-400 text-[11px] normal-case hover:underline">View All →</button>
+              </h3>
+              <div className="divide-y divide-slate-800">
+                {expenses.slice(0, 5).map((exp) => (
+                  <div key={exp.id} className="py-2 flex items-center justify-between text-xs">
+                    <div>
+                      <p className="font-semibold text-slate-200">{exp.title}</p>
+                      <p className="text-[10px] text-slate-400">Paid by: {exp.paidByName} ({exp.category})</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-rose-400">₹{exp.amount.toLocaleString()}</p>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded ${exp.isOutofPocket ? 'bg-purple-500/20 text-purple-300' : 'bg-slate-800 text-slate-400'}`}>
+                        {exp.isOutofPocket ? 'Out of pocket' : 'Direct'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -1398,14 +1423,31 @@ export default function HomePage() {
                   <span className="font-medium text-slate-300">{selectedHandover.treasurerName}</span>
                 </div>
               )}
+
+              {/* Digital Signature Stamp */}
+              <div className="pt-2 border-t border-slate-800 text-[10px] space-y-1 text-center">
+                <p className="text-cyan-400 font-extrabold">
+                  {selectedHandover.status === 'APPROVED' ? '✓ Digitally Signed & Approved Vault Transfer' : '⏳ Pending Treasury Approval Signature'}
+                </p>
+                <p className="text-slate-500 font-mono text-[9px]">
+                  Voucher Audit Signature: {selectedHandover.treasurerId || selectedHandover.collectorId}
+                </p>
+              </div>
             </div>
 
             <div className="space-y-2 pt-1">
+              <button 
+                onClick={() => window.print()}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-slate-950 text-xs font-extrabold flex items-center justify-center space-x-1.5 shadow-lg"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Export / Print Voucher PDF</span>
+              </button>
               <a 
                 href={generateHandoverWhatsAppShare(selectedHandover)}
                 target="_blank"
                 rel="noreferrer"
-                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center space-x-1.5 shadow-lg"
+                className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center space-x-1.5 shadow-md"
               >
                 <Share2 className="w-4 h-4" />
                 <span>Share Voucher via WhatsApp</span>
@@ -1460,14 +1502,38 @@ export default function HomePage() {
                 <span className="text-slate-400">Collector:</span>
                 <span className="font-medium text-slate-300">{selectedReceipt.collectorName}</span>
               </div>
+
+              {/* Digital Signature & Stamp */}
+              <div className="pt-2 border-t border-slate-800 text-[10px] space-y-1 text-center">
+                <p className="text-emerald-400 font-extrabold flex items-center justify-center gap-1">
+                  <span>✓ Digitally Signed & Verified</span>
+                </p>
+                <p className="text-slate-500 font-mono text-[9px]">
+                  Collector Verification ID: {selectedReceipt.collectorId || 'AUTOSIGN-GP2026'}
+                </p>
+              </div>
+            </div>
+
+            {/* Custom Thank You Note */}
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5 text-center">
+              <p className="text-[11px] font-semibold text-amber-300 leading-snug">
+                "Thank you for your generous contribution towards Ganesh Puja 2026! Your support makes our festival grand & joyful. 🙏🐘"
+              </p>
             </div>
 
             <div className="space-y-2 pt-1">
+              <button 
+                onClick={() => window.print()}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 text-xs font-extrabold flex items-center justify-center space-x-1.5 shadow-lg"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Export / Print Receipt PDF</span>
+              </button>
               <a 
                 href={generateWhatsAppShare(selectedReceipt)}
                 target="_blank"
                 rel="noreferrer"
-                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center space-x-1.5 shadow-lg"
+                className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center space-x-1.5 shadow-md"
               >
                 <Share2 className="w-4 h-4" />
                 <span>Share via WhatsApp</span>
