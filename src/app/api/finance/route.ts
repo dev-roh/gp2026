@@ -124,7 +124,10 @@ export async function POST(req: Request) {
       let status: 'APPROVED' | 'PENDING_COLLECTOR_APPROVAL' | 'PENDING_SUPER_ADMIN_APPROVAL' = 'APPROVED';
       let approverEmail = data.collectorId;
 
-      if (isSelf) {
+      // Check if the contribution member is the collector/treasurer themselves or self-contribution
+      const isSelfOrOwnCollection = isSelf || (data.memberId && data.memberId.toLowerCase() === userEmail.toLowerCase()) || (data.memberName && session?.user?.name && data.memberName.trim().toLowerCase() === session.user.name.trim().toLowerCase());
+
+      if (isSelfOrOwnCollection) {
         if (userRole === 'VIEW_ONLY' || userRole === 'MEMBER') {
           status = 'PENDING_COLLECTOR_APPROVAL';
         } else if (userRole === 'COLLECTOR' || userRole === 'TREASURER') {
