@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getDb, saveDb, getUserRole, registerOrUpdateUser } from '@/lib/db';
+import { getDbAsync, saveDbAsync, getUserRole, registerOrUpdateUser } from '@/lib/db';
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -14,7 +14,7 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const format = searchParams.get('format');
-  const db = getDb();
+  const db = await getDbAsync();
 
   if (format === 'csv') {
     let csv = 'Type,ID,Date,Name/Title,Area/Category,Amount,PaymentMode/OutofPocket,Collector/PaidBy,Status,Notes\n';
@@ -118,7 +118,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const db = getDb();
+    const db = await getDbAsync();
     const { type, data } = body;
 
     // SELF CONTRIBUTION / RECORD CONTRIBUTION WORKFLOW
@@ -173,7 +173,7 @@ export async function POST(req: Request) {
         });
       }
 
-      saveDb(db);
+      await saveDbAsync(db);
       return NextResponse.json({ success: true, item: newContribution, status });
     }
 
@@ -212,7 +212,7 @@ export async function POST(req: Request) {
         db.contributions[index].status = 'REJECTED';
       }
 
-      saveDb(db);
+      await saveDbAsync(db);
       return NextResponse.json({ success: true, item: db.contributions[index] });
     }
 
@@ -224,7 +224,7 @@ export async function POST(req: Request) {
         ...data
       };
       db.expenses.push(newExpense);
-      saveDb(db);
+      await saveDbAsync(db);
       return NextResponse.json({ success: true, item: newExpense });
     }
 
@@ -236,7 +236,7 @@ export async function POST(req: Request) {
         ...data
       };
       db.handovers.push(newHandover);
-      saveDb(db);
+      await saveDbAsync(db);
       return NextResponse.json({ success: true, item: newHandover });
     }
 
@@ -249,7 +249,7 @@ export async function POST(req: Request) {
         db.handovers[index].status = 'APPROVED';
         db.handovers[index].treasurerId = userEmail;
         db.handovers[index].treasurerName = session?.user?.name || 'Treasurer';
-        saveDb(db);
+        await saveDbAsync(db);
         return NextResponse.json({ success: true, item: db.handovers[index] });
       }
     }
@@ -280,7 +280,7 @@ export async function POST(req: Request) {
           date: new Date().toISOString()
         });
 
-        saveDb(db);
+        await saveDbAsync(db);
         return NextResponse.json({ success: true, item: exp });
       }
     }
@@ -323,7 +323,7 @@ export async function POST(req: Request) {
 
       if (!db.programmes) db.programmes = [];
       db.programmes.push(newProg);
-      saveDb(db);
+      await saveDbAsync(db);
       return NextResponse.json({ success: true, item: newProg });
     }
 
@@ -333,7 +333,7 @@ export async function POST(req: Request) {
       }
       if (!db.programmes) db.programmes = [];
       db.programmes = db.programmes.filter(p => p.id !== data.programmeId);
-      saveDb(db);
+      await saveDbAsync(db);
       return NextResponse.json({ success: true });
     }
 
@@ -375,7 +375,7 @@ export async function POST(req: Request) {
         date: new Date().toISOString()
       });
 
-      saveDb(db);
+      await saveDbAsync(db);
       return NextResponse.json({ success: true, item: newReq });
     }
 
@@ -428,7 +428,7 @@ export async function POST(req: Request) {
         });
       }
 
-      saveDb(db);
+      await saveDbAsync(db);
       return NextResponse.json({ success: true, item: targetReq });
     }
 

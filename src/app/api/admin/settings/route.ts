@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getDb, saveDb, getUserRole } from '@/lib/db';
+import { getDbAsync, saveDbAsync, getUserRole } from '@/lib/db';
 
 export async function GET() {
-  const db = getDb();
+  const db = await getDbAsync();
   return NextResponse.json({ settings: db.settings });
 }
 
@@ -18,14 +18,14 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const db = getDb();
+    const db = await getDbAsync();
 
     db.settings = {
       ...db.settings,
       ...body
     };
 
-    saveDb(db);
+    await saveDbAsync(db);
     return NextResponse.json({ success: true, settings: db.settings });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

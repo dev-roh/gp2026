@@ -127,6 +127,8 @@ export interface DatabaseSchema {
   membershipRequests: MembershipRequest[];
 }
 
+import { createClient } from '@supabase/supabase-js';
+
 declare global {
   var _cachedDb: DatabaseSchema | undefined;
 }
@@ -135,6 +137,13 @@ const primaryDbPath = path.join(process.cwd(), 'data', 'db.json');
 const tmpDbPath = path.join('/tmp', 'db.json');
 
 const SUPER_ADMIN_EMAIL = 'luhurenbaiclub@gmail.com';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+export const supabase = (supabaseUrl && supabaseKey) 
+  ? createClient(supabaseUrl, supabaseKey) 
+  : null;
 
 const defaultSettings: AppSettings = {
   appTitle: 'Ganesh Puja - LBC',
@@ -164,6 +173,42 @@ const initialData: DatabaseSchema = {
   programmes: [],
   membershipRequests: []
 };
+
+export async function getDbAsync(): Promise<DatabaseSchema> {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('app_db')
+        .select('data')
+        .eq('id', 'main')
+        .single();
+      
+      if (!error && data?.data) {
+        global._cachedDb = data.data as DatabaseSchema;
+        return global._cachedDb;
+      }
+    } catch (err) {
+      console.error('Supabase fetch error:', err);
+    }
+  }
+
+  return getDb();
+}
+
+export async function saveDbAsync(data: DatabaseSchema): Promise<void> {
+  global._cachedDb = data;
+  saveDb(data);
+
+  if (supabase) {
+    try {
+      await supabase
+        .from('app_db')
+        .upsert({ id: 'main', data, updated_at: new Date().toISOString() });
+    } catch (err) {
+      console.error('Supabase save error:', err);
+    }
+  }
+}
 
 export function getDb(): DatabaseSchema {
   // 1. Return in-memory cached DB if already loaded in process

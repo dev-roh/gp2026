@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getDb, saveDb, getUserRole } from '@/lib/db';
+import { getDbAsync, saveDbAsync, getUserRole } from '@/lib/db';
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -12,7 +12,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden. Super Admin access required.' }, { status: 403 });
   }
 
-  const db = getDb();
+  const db = await getDbAsync();
   return NextResponse.json({
     roleAssignments: Object.values(db.roleAssignments),
     superAdminEmail: 'luhurenbaiclub@gmail.com'
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid target role.' }, { status: 400 });
     }
 
-    const db = getDb();
+    const db = await getDbAsync();
     const emailsToProcess: string[] = [];
 
     if (Array.isArray(targetEmails) && targetEmails.length > 0) {
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
       addedCount++;
     });
 
-    saveDb(db);
+    await saveDbAsync(db);
     return NextResponse.json({ success: true, count: addedCount, message: `Successfully assigned ${newRole} role to ${addedCount} user email(s).` });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -82,7 +82,7 @@ export async function DELETE() {
       return NextResponse.json({ error: 'Forbidden. Only Super Admin can reset application database.' }, { status: 403 });
     }
 
-    const db = getDb();
+    const db = await getDbAsync();
     const superAdminUser = db.users.find(u => u.email.toLowerCase() === 'luhurenbaiclub@gmail.com') || {
       id: 'usr-0',
       name: 'Super Admin',
@@ -106,7 +106,7 @@ export async function DELETE() {
       }
     };
 
-    saveDb(db);
+    await saveDbAsync(db);
     return NextResponse.json({ success: true, message: 'Database reset successfully for fresh start.' });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
