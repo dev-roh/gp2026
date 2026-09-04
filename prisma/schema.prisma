@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+enum Role {
+  ADMIN
+  TREASURER
+  COLLECTOR
+  MEMBER
+}
+
+enum PaymentMode {
+  CASH
+  UPI
+  BANK_TRANSFER
+}
+
+enum HandoverStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id            String          @id @default(uuid())
+  name          String
+  email         String          @unique
+  image         String?
+  role          Role            @default(MEMBER)
+  flatNo        String?
+  phone         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  collections   Contribution[]  @relation("CollectorRelation")
+  myContributions Contribution[] @relation("MemberRelation")
+  handoversSent Handover[]      @relation("CollectorHandover")
+  handoversReceived Handover[]  @relation("TreasurerHandover")
+  expenses      Expense[]       @relation("PaidByRelation")
+}
+
+model MemberTarget {
+  id            String    @id @default(uuid())
+  name          String
+  flatNo        String    @unique
+  phone         String?
+  targetAmount  Float     @default(5000)
+  createdAt     DateTime  @default(now())
+}
+
+model Contribution {
+  id            String      @id @default(uuid())
+  amount        Float
+  paymentMode   PaymentMode
+  receiptNo     String      @unique
+  note          String?
+  date          DateTime    @default(now())
+  
+  memberId      String?
+  member        User?       @relation("MemberRelation", fields: [memberId], references: [id])
+  
+  collectorId   String
+  collector     User        @relation("CollectorRelation", fields: [collectorId], references: [id])
+
+  createdAt     DateTime    @default(now())
+}
+
+model Handover {
+  id            String         @id @default(uuid())
+  amount        Float
+  status        HandoverStatus @default(PENDING)
+  notes         String?
+  date          DateTime       @default(now())
+
+  collectorId   String
+  collector     User           @relation("CollectorHandover", fields: [collectorId], references: [id])
+
+  treasurerId   String?
+  treasurer     User?          @relation("TreasurerHandover", fields: [treasurerId], references: [id])
+
+  createdAt     DateTime       @default(now())
+}
+
+model Expense {
+  id            String   @id @default(uuid())
+  title         String
+  category      String
+  amount        Float
+  isOutofPocket Boolean  @default(false)
+  isReimbursed  Boolean  @default(false)
+  receiptUrl    String?
+  date          DateTime @default(now())
+
+  paidById      String
+  paidBy        User     @relation("PaidByRelation", fields: [paidById], references: [id])
+
+  createdAt     DateTime @default(now())
+}

@@ -1,0 +1,21 @@
+# dependencies / build
+/node_modules
+/.next/
+/out/
+/build
+
+# Local data / DB
+/data/db.json
+/prisma/dev.db
+/prisma/dev.db-journal
+
+# Secrets & Environment Variables (CRITICAL)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE & OS
+.DS_Store
+*.pem
