@@ -1474,33 +1474,35 @@ export default function HomePage() {
 
       {/* TAB CONTENT: Super Admin Roles */}
       {activeTab === 'admin' && isSuperAdmin && (
-        <div className="bg-slate-900 border border-purple-500/30 rounded-xl p-3 shadow-md space-y-4">
-          <div className="flex items-center space-x-2">
-            <ShieldCheck className="w-5 h-5 text-purple-400" />
+        <div className="bg-white border border-amber-200/80 rounded-3xl p-5 shadow-sm space-y-4">
+          <div className="flex items-center space-x-2.5 border-b border-amber-100 pb-3">
+            <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
+              <ShieldCheck className="w-4 h-4 text-purple-600" />
+            </div>
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-purple-300">Super Admin User Role Console</h3>
-              <p className="text-[10px] text-slate-400">Promote members or assign custom permissions securely</p>
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">Super Admin User Role Console</h3>
+              <p className="text-[10px] text-slate-500 font-medium">Promote members or assign custom permissions securely</p>
             </div>
           </div>
 
-          <form onSubmit={handleAssignRole} className="space-y-2.5 text-xs bg-slate-850 p-3 rounded-xl border border-slate-800">
+          <form onSubmit={handleAssignRole} className="space-y-3 text-xs bg-purple-50/40 p-4 rounded-2xl border border-purple-200/60">
             <div>
-              <label className="block text-slate-400 mb-1 font-semibold">User Email Address(es) - Single or Bulk</label>
+              <label className="block text-slate-700 mb-1 font-extrabold">User Email Address(es) - Single or Bulk</label>
               <textarea 
                 placeholder="Enter single email or paste bulk emails (separated by commas or newlines)&#10;e.g. member1@gmail.com, collector2@gmail.com"
                 rows={3}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-purple-500 font-mono text-[11px]"
+                className="w-full bg-white border border-purple-200 rounded-xl p-2.5 text-slate-900 focus:outline-none focus:border-purple-500 font-mono text-[11px]"
                 value={targetEmail}
                 onChange={(e) => setTargetEmail(e.target.value)}
                 required
               />
-              <p className="text-[9px] text-slate-500 mt-0.5">Supports pasting lists from Excel, Google Sheets, or CSV.</p>
+              <p className="text-[10px] text-slate-500 mt-1 font-medium">Supports pasting lists from Excel, Google Sheets, or CSV.</p>
             </div>
 
             <div>
-              <label className="block text-slate-400 mb-1">Assign Target Role</label>
+              <label className="block text-slate-700 mb-1 font-extrabold">Assign Target Role</label>
               <select 
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-purple-500 font-bold"
+                className="w-full bg-white border border-purple-200 rounded-xl p-2.5 text-slate-900 focus:outline-none focus:border-purple-500 font-bold"
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value as any)}
               >
@@ -1512,33 +1514,33 @@ export default function HomePage() {
               </select>
             </div>
 
-            <button type="submit" className="w-full py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold transition">
+            <button type="submit" className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-xs transition transform active:scale-95">
               Save Role Assignment
             </button>
 
             {roleMsg && (
-              <p className={`text-[11px] p-2 rounded text-center ${roleMsg.startsWith('Error') ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+              <p className={`text-[11px] font-bold p-2.5 rounded-xl text-center ${roleMsg.startsWith('Error') ? 'bg-rose-100 text-rose-800 border border-rose-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'}`}>
                 {roleMsg}
               </p>
             )}
           </form>
 
           {/* Role Assignments List */}
-          <div className="bg-slate-850 p-3 rounded-xl border border-slate-800 space-y-2">
-            <h4 className="font-bold text-slate-200 text-xs flex justify-between items-center">
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-2">
+            <h4 className="font-extrabold text-slate-800 text-xs flex justify-between items-center">
               <span>Pre-Registered Role Assignments ({roleAssignments.length})</span>
             </h4>
             {roleAssignments.length === 0 ? (
-              <p className="text-[10px] text-slate-500">No pre-assigned roles yet.</p>
+              <p className="text-[10px] text-slate-500 font-medium">No pre-assigned roles yet.</p>
             ) : (
-              <div className="divide-y divide-slate-800 max-h-48 overflow-y-auto pr-1">
+              <div className="divide-y divide-slate-200 max-h-48 overflow-y-auto pr-1">
                 {roleAssignments.map((ra) => (
-                  <div key={ra.email} className="py-1.5 flex justify-between items-center text-[11px]">
+                  <div key={ra.email} className="py-2 flex justify-between items-center text-[11px]">
                     <div>
-                      <p className="font-mono text-slate-200 text-[10px]">{ra.email}</p>
-                      <p className="text-[9px] text-slate-500">Assigned by: {ra.assignedBy}</p>
+                      <p className="font-mono text-slate-900 text-[11px] font-bold">{ra.email}</p>
+                      <p className="text-[10px] text-slate-500 font-medium">Assigned by: {ra.assignedBy}</p>
                     </div>
-                    <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold text-[9px] border border-purple-500/30">
+                    <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 font-extrabold text-[10px] border border-purple-200">
                       {ra.role}
                     </span>
                   </div>
@@ -1548,15 +1550,15 @@ export default function HomePage() {
           </div>
 
           {/* Super Admin Fresh Start Reset Button */}
-          <div className="bg-rose-950/40 border border-rose-800/40 rounded-xl p-3 space-y-2">
-            <h4 className="font-extrabold text-rose-400 text-xs">⚠️ Fresh Start Data Reset</h4>
-            <p className="text-[10px] text-slate-400">
+          <div className="bg-rose-50 border border-rose-200/80 rounded-2xl p-4 space-y-2">
+            <h4 className="font-extrabold text-rose-800 text-xs">⚠️ Fresh Start Data Reset</h4>
+            <p className="text-xs text-slate-600 font-medium leading-relaxed">
               Clear all test contributions, expenses, handovers, and non-admin accounts to prepare the application for official production launch.
             </p>
             <button
               type="button"
               onClick={handleResetDatabase}
-              className="w-full py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-md transition"
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-extrabold text-xs shadow-xs transition"
             >
               Reset Application Database (Fresh Start)
             </button>
@@ -1566,39 +1568,41 @@ export default function HomePage() {
 
       {/* TAB CONTENT: Super Admin Branding Console */}
       {activeTab === 'branding' && isSuperAdmin && (
-        <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-3 shadow-md space-y-4 text-xs">
-          <div className="flex items-center space-x-2">
-            <Sliders className="w-5 h-5 text-amber-400" />
+        <div className="bg-white border border-amber-200/80 rounded-3xl p-5 shadow-sm space-y-4 text-xs">
+          <div className="flex items-center space-x-2.5 border-b border-amber-100 pb-3">
+            <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+              <Sliders className="w-4 h-4 text-amber-600" />
+            </div>
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-300">App Branding & Custom Labels</h3>
-              <p className="text-[10px] text-slate-400">Customize logos, color themes, and form button labels</p>
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">App Branding & Custom Labels</h3>
+              <p className="text-[10px] text-slate-500 font-medium">Customize logos, color themes, and form button labels</p>
             </div>
           </div>
 
-          <form onSubmit={handleUpdateSettings} className="space-y-3 bg-slate-850 p-3 rounded-xl border border-slate-800">
+          <form onSubmit={handleUpdateSettings} className="space-y-3 bg-amber-50/40 p-4 rounded-2xl border border-amber-200/60">
             <div>
-              <label className="block text-slate-400 mb-1 font-semibold flex items-center gap-1">
-                <ImageIcon className="w-3.5 h-3.5 text-amber-400" /> App Logo Image
+              <label className="block text-slate-700 mb-1 font-extrabold flex items-center gap-1">
+                <ImageIcon className="w-3.5 h-3.5 text-amber-600" /> App Logo Image
               </label>
               <div className="flex items-center space-x-3">
                 {settings.logoUrl && (
-                  <img src={settings.logoUrl} alt="Logo Preview" className="w-10 h-10 rounded-lg object-cover border border-amber-500/30" />
+                  <img src={settings.logoUrl} alt="Logo Preview" className="w-10 h-10 rounded-xl object-cover border border-amber-300 shadow-xs" />
                 )}
                 <input 
                   type="file" 
                   accept="image/*"
                   onChange={handleLogoUpload}
-                  className="w-full text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-amber-600 file:text-white hover:file:bg-amber-500"
+                  className="w-full text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-gradient-to-r file:from-orange-500 file:to-amber-500 file:text-white hover:file:from-orange-600 hover:file:to-amber-600"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-slate-400 mb-1 font-semibold flex items-center gap-1">
-                <Palette className="w-3.5 h-3.5 text-amber-400" /> Visual Color Theme
+              <label className="block text-slate-700 mb-1 font-extrabold flex items-center gap-1">
+                <Palette className="w-3.5 h-3.5 text-amber-600" /> Visual Color Theme
               </label>
               <select 
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-amber-500 font-bold"
+                className="w-full bg-white border border-amber-200 rounded-xl p-2.5 text-slate-900 focus:outline-none focus:border-orange-500 font-bold"
                 value={settings.themeColor}
                 onChange={(e) => setSettings({ ...settings, themeColor: e.target.value as any })}
               >
@@ -1611,20 +1615,20 @@ export default function HomePage() {
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-slate-400 mb-1">App Title</label>
+                <label className="block text-slate-700 mb-1 font-extrabold">App Title</label>
                 <input 
                   type="text" 
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-amber-500"
+                  className="w-full bg-white border border-amber-200 rounded-xl p-2.5 text-slate-900 focus:outline-none focus:border-orange-500 font-bold"
                   value={settings.appTitle}
                   onChange={(e) => setSettings({ ...settings, appTitle: e.target.value })}
                   required
                 />
               </div>
               <div>
-                <label className="block text-slate-400 mb-1">Target Amount (₹)</label>
+                <label className="block text-slate-700 mb-1 font-extrabold">Target Amount (₹)</label>
                 <input 
                   type="number" 
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-amber-500 font-bold text-emerald-400"
+                  className="w-full bg-white border border-amber-200 rounded-xl p-2.5 text-slate-900 focus:outline-none focus:border-orange-500 font-bold text-amber-700"
                   value={settings.targetGoalAmount}
                   onChange={(e) => setSettings({ ...settings, targetGoalAmount: parseFloat(e.target.value) || 0 })}
                   required
@@ -1633,10 +1637,10 @@ export default function HomePage() {
             </div>
 
             <div>
-              <label className="block text-slate-400 mb-1 font-semibold">Configured Area / Wing Options (Comma-separated)</label>
+              <label className="block text-slate-700 mb-1 font-extrabold">Configured Area / Wing Options (Comma-separated)</label>
               <input 
                 type="text" 
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-amber-500 font-mono text-xs"
+                className="w-full bg-white border border-amber-200 rounded-xl p-2.5 text-slate-900 focus:outline-none focus:border-orange-500 font-mono text-xs"
                 placeholder="Sector 1 / Wing A, Sector 2 / Wing B, General Area"
                 value={(settings.areaOptions || []).join(', ')}
                 onChange={(e) => {
@@ -1644,15 +1648,15 @@ export default function HomePage() {
                   setSettings({ ...settings, areaOptions: opts });
                 }}
               />
-              <p className="text-[9px] text-slate-500 mt-1">These options will populate dropdown selections in collection forms.</p>
+              <p className="text-[10px] text-slate-500 mt-1 font-medium">These options will populate dropdown selections in collection forms.</p>
             </div>
 
-            <button type="submit" className="w-full py-2.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold transition shadow-lg">
+            <button type="submit" className="w-full py-2.5 rounded-xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-xs shadow-md transition transform active:scale-95">
               Save Branding & Label Customizations
             </button>
 
             {settingsMsg && (
-              <p className={`text-[11px] p-2 rounded text-center ${settingsMsg.startsWith('Error') ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+              <p className={`text-[11px] font-bold p-2.5 rounded-xl text-center ${settingsMsg.startsWith('Error') ? 'bg-rose-100 text-rose-800 border border-rose-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'}`}>
                 {settingsMsg}
               </p>
             )}
