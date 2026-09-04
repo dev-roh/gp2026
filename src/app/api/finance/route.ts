@@ -79,11 +79,17 @@ export async function GET(req: Request) {
   // User-specific Notifications
   const myNotifications = (db.notifications || []).filter(n => n.recipientEmail.toLowerCase() === userEmail.toLowerCase());
 
-  // Pending Contributions requiring approval by THIS user
+  // Pending Approvals & Requests requiring action by THIS user
   const pendingApprovalsForMe = db.contributions.filter(c => 
     (c.status === 'PENDING_COLLECTOR_APPROVAL' && c.approverEmail?.toLowerCase() === userEmail.toLowerCase()) ||
     (c.status === 'PENDING_SUPER_ADMIN_APPROVAL' && userRole === 'SUPER_ADMIN')
   );
+
+  const pendingMembershipRequestsCount = (userRole === 'SUPER_ADMIN' || userRole === 'TREASURER')
+    ? (db.membershipRequests || []).filter(r => r.status === 'PENDING').length
+    : 0;
+
+  const totalPendingActionCount = pendingApprovalsForMe.length + pendingMembershipRequestsCount;
 
   return NextResponse.json({
     settings: db.settings,
@@ -98,6 +104,7 @@ export async function GET(req: Request) {
     collectorBalances,
     latestContributions: db.contributions.slice().reverse(),
     pendingApprovalsForMe,
+    totalPendingActionCount,
     notifications: myNotifications,
     latestExpenses: db.expenses.slice().reverse(),
     handovers: db.handovers.slice().reverse(),

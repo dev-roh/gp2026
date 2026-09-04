@@ -250,6 +250,7 @@ export default function HomePage() {
   const [collectorBalances, setCollectorBalances] = useState<CollectorBalance[]>([]);
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [pendingApprovalsForMe, setPendingApprovalsForMe] = useState<Contribution[]>([]);
+  const [totalPendingActionCount, setTotalPendingActionCount] = useState<number>(0);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [handovers, setHandovers] = useState<Handover[]>([]);
   const [programmes, setProgrammes] = useState<ProgrammeItem[]>([]);
@@ -360,6 +361,7 @@ export default function HomePage() {
       setCollectorBalances(data.collectorBalances);
       setContributions(data.latestContributions);
       setPendingApprovalsForMe(data.pendingApprovalsForMe || []);
+      setTotalPendingActionCount(data.totalPendingActionCount || (data.pendingApprovalsForMe || []).length);
       setExpenses(data.latestExpenses);
       setHandovers(data.handovers);
       setProgrammes(data.programmes || []);
@@ -875,15 +877,15 @@ export default function HomePage() {
 
         <div className="flex items-center space-x-2">
           {/* Pending Approvals Bell Icon */}
-          {pendingApprovalsForMe.length > 0 && (
+          {totalPendingActionCount > 0 && (
             <button 
               onClick={() => setActiveTab('approvals')}
               className="relative p-2 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100 animate-pulse shadow-xs"
-              title="Pending Verification Approvals"
+              title="Pending Verification Approvals & Membership Requests"
             >
               <Bell className="w-4 h-4 text-amber-600" />
               <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] font-black flex items-center justify-center">
-                {pendingApprovalsForMe.length}
+                {totalPendingActionCount}
               </span>
             </button>
           )}
@@ -1032,13 +1034,15 @@ export default function HomePage() {
           <span>Schedule & Media</span>
         </button>
 
-        {pendingApprovalsForMe.length > 0 && (
+        {(totalPendingActionCount > 0 || isSuperAdmin || isTreasurer) && (
           <button 
             onClick={() => setActiveTab('approvals')} 
             className={`flex-1 py-2 px-3.5 rounded-xl text-center whitespace-nowrap transition flex items-center justify-center gap-1 ${activeTab === 'approvals' ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm' : 'text-amber-700 hover:text-amber-900'}`}
           >
             <span>Approvals</span>
-            <span className="bg-amber-900 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black">{pendingApprovalsForMe.length}</span>
+            {totalPendingActionCount > 0 && (
+              <span className="bg-amber-900 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black">{totalPendingActionCount}</span>
+            )}
           </button>
         )}
 
