@@ -89,7 +89,7 @@ interface RoleAssignment {
 
 export default function HomePage() {
   const { data: session, status } = useSession();
-  const [activeTab, setActiveTab] = useState<'overview' | 'collectors' | 'contributions' | 'expenses' | 'approvals' | 'admin' | 'branding'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'collectors' | 'contributions' | 'expenses' | 'reimbursements' | 'approvals' | 'admin' | 'branding'>('overview');
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [collectorBalances, setCollectorBalances] = useState<CollectorBalance[]>([]);
@@ -437,12 +437,15 @@ export default function HomePage() {
   };
 
   const handleSettleReimbursement = async (expenseId: string) => {
+    const mode = prompt('Enter payment settlement mode (CASH or UPI):', 'UPI')?.toUpperCase();
+    if (!mode || (mode !== 'CASH' && mode !== 'UPI')) return;
+
     const res = await fetch('/api/finance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type: 'SETTLE_REIMBURSEMENT',
-        data: { expenseId }
+        data: { expenseId, settlementMode: mode }
       })
     });
     const result = await res.json();
@@ -715,6 +718,17 @@ export default function HomePage() {
           className={`flex-1 py-2 px-3 rounded-lg text-center whitespace-nowrap transition ${activeTab === 'expenses' ? `${theme.bg} text-white font-bold shadow` : 'text-slate-400 hover:text-slate-200'}`}
         >
           Expenses
+        </button>
+        <button 
+          onClick={() => setActiveTab('reimbursements')} 
+          className={`flex-1 py-2 px-3 rounded-lg text-center whitespace-nowrap transition flex items-center justify-center space-x-1 ${activeTab === 'reimbursements' ? 'bg-emerald-600 text-white font-bold shadow' : 'text-emerald-400 hover:text-emerald-200'}`}
+        >
+          <span>Reimbursements</span>
+          {expenses.filter(e => e.isOutofPocket && !e.isReimbursed).length > 0 && (
+            <span className="px-1.5 py-0.2 text-[9px] rounded-full bg-emerald-500 text-slate-950 font-extrabold">
+              {expenses.filter(e => e.isOutofPocket && !e.isReimbursed).length}
+            </span>
+          )}
         </button>
 
         {isSuperAdmin && (
@@ -1007,6 +1021,71 @@ export default function HomePage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT: Reimbursements */}
+      {activeTab === 'reimbursements' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
+              <p className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">Unsettled OOP Claims</p>
+              <p className="text-xl font-extrabold text-purple-300 mt-1">
+                ₹{expenses.filter(e => e.isOutofPocket && !e.isReimbursed).reduce((sum, e) => sum + e.amount, 0).toLocaleString()}
+              </p>
+              <p className="text-[9px] text-slate-500">{expenses.filter(e => e.isOutofPocket && !e.isReimbursed).length} claims pending</p>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
+              <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Total Reimbursed</p>
+              <p className="text-xl font-extrabold text-emerald-300 mt-1">
+                ₹{expenses.filter(e => e.isOutofPocket && e.isReimbursed).reduce((sum, e) => sum + e.amount, 0).toLocaleString()}
+              </p>
+              <p className="text-[9px] text-slate-500">{expenses.filter(e => e.isOutofPocket && e.isReimbursed).length} claims settled</p>
+            </div>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
+            <h3 className="font-bold text-slate-200 text-xs mb-3">Out-Of-Pocket Expense Claims Ledger</h3>
+            {expenses.filter(e => e.isOutofPocket).length === 0 ? (
+              <p className="text-xs text-slate-500 py-4 text-center">No out-of-pocket expenses logged yet.</p>
+            ) : (
+              <div className="space-y-3 divide-y divide-slate-800/60">
+                {expenses.filter(e => e.isOutofPocket).map((exp) => (
+                  <div key={exp.id} className="pt-3 first:pt-0 flex justify-between items-start">
+                    <div className="space-y-1 max-w-[65%]">
+                      <p className="font-bold text-slate-200 text-xs">{exp.title}</p>
+                      <p className="text-[10px] text-slate-400">Claimant: <span className="text-orange-400 font-medium">{exp.paidByName}</span></p>
+                      <div className="flex flex-wrap gap-1">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">{exp.category}</span>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${exp.isReimbursed ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'}`}>
+                          {exp.isReimbursed ? '✅ Reimbursed' : '⏳ Pending Payment'}
+                        </span>
+                      </div>
+                      {exp.isReimbursed && exp.settlementDate && (
+                        <p className="text-[9px] text-slate-500 italic">
+                          Settled via {exp.settlementMode || 'CASH'} on {new Date(exp.settlementDate).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="text-right space-y-1">
+                      <p className="font-extrabold text-amber-400 text-sm">₹{exp.amount.toLocaleString()}</p>
+                      {!exp.isReimbursed && isTreasurer ? (
+                        <button
+                          onClick={() => handleSettleReimbursement(exp.id)}
+                          className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-950 text-[10px] font-extrabold shadow flex items-center space-x-1 ml-auto"
+                        >
+                          <span>Settle & Pay</span>
+                        </button>
+                      ) : !exp.isReimbursed ? (
+                        <span className="text-[9px] text-slate-500">Requires Treasurer approval</span>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

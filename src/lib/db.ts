@@ -83,6 +83,10 @@ export interface Expense {
   date: string;
   paidById: string;
   paidByName: string;
+  settledBy?: string;
+  settlementMode?: 'CASH' | 'UPI';
+  settlementDate?: string;
+  settlementNote?: string;
 }
 
 export interface DatabaseSchema {

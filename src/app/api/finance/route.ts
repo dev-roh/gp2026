@@ -248,9 +248,28 @@ export async function POST(req: Request) {
       }
       const index = db.expenses.findIndex(e => e.id === data.expenseId);
       if (index !== -1) {
-        db.expenses[index].isReimbursed = true;
+        const exp = db.expenses[index];
+        exp.isReimbursed = true;
+        exp.settledBy = userEmail;
+        exp.settlementMode = data.settlementMode || 'CASH';
+        exp.settlementDate = new Date().toISOString();
+        exp.settlementNote = data.settlementNote || '';
+
+        // Add Notification to claimant
+        if (!db.notifications) db.notifications = [];
+        db.notifications.push({
+          id: `notif-${Date.now()}`,
+          recipientEmail: exp.paidById || 'luhurenbaiclub@gmail.com',
+          title: 'Out-Of-Pocket Expense Reimbursed! 💵',
+          message: `Your out-of-pocket spend of ₹${exp.amount} for "${exp.title}" has been reimbursed via ${exp.settlementMode}.`,
+          type: 'CONTRIBUTION_APPROVED',
+          targetId: exp.id,
+          isRead: false,
+          date: new Date().toISOString()
+        });
+
         saveDb(db);
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true, item: exp });
       }
     }
 
