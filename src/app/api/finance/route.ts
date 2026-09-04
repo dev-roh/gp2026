@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb } from '../../../lib/db';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { getDb, saveDb, getUserRole } from '@/lib/db';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -7,7 +9,6 @@ export async function GET(req: Request) {
   const db = getDb();
 
   if (format === 'csv') {
-    // Generate CSV for contributions & expenses
     let csv = 'Type,ID,Date,Name/Title,Flat/Category,Amount,PaymentMode/OutofPocket,Collector/PaidBy,Notes/Status\n';
     
     db.contributions.forEach(c => {
@@ -42,7 +43,7 @@ export async function GET(req: Request) {
 
   // Per collector balances
   const collectorBalances = db.users
-    .filter(u => u.role === 'COLLECTOR' || u.role === 'TREASURER')
+    .filter(u => u.role === 'COLLECTOR' || u.role === 'TREASURER' || u.role === 'SUPER_ADMIN')
     .map(collector => {
       const totalCashCollected = db.contributions
         .filter(c => c.collectorId === collector.id && c.paymentMode === 'CASH')
@@ -84,11 +85,22 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    const userRole = getUserRole(session?.user?.email);
+
     const body = await req.json();
     const db = getDb();
     const { type, data } = body;
 
+    // VIEW_ONLY users are strictly prohibited from performing write operations
+    if (userRole === 'VIEW_ONLY') {
+      return NextResponse.json({ error: 'Forbidden. VIEW_ONLY users cannot perform mutations.' }, { status: 403 });
+    }
+
     if (type === 'ADD_CONTRIBUTION') {
+      if (userRole === 'MEMBER') {
+        return NextResponse.json({ error: 'Forbidden. Members cannot record collections.' }, { status: 403 });
+      }
       const newContribution = {
         id: `cnt-${Date.now()}`,
         receiptNo: `REC-2026-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -113,6 +125,9 @@ export async function POST(req: Request) {
     }
 
     if (type === 'REQUEST_HANDOVER') {
+      if (userRole === 'MEMBER') {
+        return NextResponse.json({ error: 'Forbidden. Members cannot request cash handovers.' }, { status: 403 });
+      }
       const newHandover = {
         id: `hnd-${Date.now()}`,
         status: 'PENDING',
@@ -125,6 +140,9 @@ export async function POST(req: Request) {
     }
 
     if (type === 'APPROVE_HANDOVER') {
+      if (userRole !== 'SUPER_ADMIN' && userRole !== 'TREASURER') {
+        return NextResponse.json({ error: 'Forbidden. Only Super Admin or Treasurer can approve handovers.' }, { status: 403 });
+      }
       const index = db.handovers.findIndex(h => h.id === data.handoverId);
       if (index !== -1) {
         db.handovers[index].status = 'APPROVED';
@@ -135,6 +153,9 @@ export async function POST(req: Request) {
     }
 
     if (type === 'SETTLE_REIMBURSEMENT') {
+      if (userRole !== 'SUPER_ADMIN' && userRole !== 'TREASURER') {
+        return NextResponse.json({ error: 'Forbidden. Only Super Admin or Treasurer can settle reimbursements.' }, { status: 403 });
+      }
       const index = db.expenses.findIndex(e => e.id === data.expenseId);
       if (index !== -1) {
         db.expenses[index].isReimbursed = true;

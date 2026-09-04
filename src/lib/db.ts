@@ -6,10 +6,17 @@ export interface User {
   name: string;
   email: string;
   image?: string;
-  role: 'ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER';
+  role: 'SUPER_ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER' | 'VIEW_ONLY';
   flatNo?: string;
   phone?: string;
   createdAt: string;
+}
+
+export interface UserRoleAssignment {
+  email: string;
+  role: 'SUPER_ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER' | 'VIEW_ONLY';
+  assignedBy: string;
+  updatedAt: string;
 }
 
 export interface Contribution {
@@ -52,6 +59,7 @@ export interface Expense {
 
 export interface DatabaseSchema {
   users: User[];
+  roleAssignments: Record<string, UserRoleAssignment>;
   contributions: Contribution[];
   handovers: Handover[];
   expenses: Expense[];
@@ -59,14 +67,19 @@ export interface DatabaseSchema {
 
 const dbPath = path.join(process.cwd(), 'data', 'db.json');
 
+const SUPER_ADMIN_EMAIL = 'luhurenbaiclub@gmail.com';
+
 const initialData: DatabaseSchema = {
   users: [
+    { id: 'usr-0', name: 'Super Admin', email: SUPER_ADMIN_EMAIL, role: 'SUPER_ADMIN', flatNo: 'Admin', phone: '+919999999999', createdAt: new Date().toISOString() },
     { id: 'usr-1', name: 'Rajesh Sharma (Treasurer)', email: 'treasurer@gp2026.com', role: 'TREASURER', flatNo: 'A-401', phone: '+919876543210', createdAt: new Date().toISOString() },
     { id: 'usr-2', name: 'Amit Patel (Collector)', email: 'collector1@gp2026.com', role: 'COLLECTOR', flatNo: 'B-102', phone: '+919876543211', createdAt: new Date().toISOString() },
-    { id: 'usr-3', name: 'Suresh Verma (Collector)', email: 'collector2@gp2026.com', role: 'COLLECTOR', flatNo: 'C-304', phone: '+919876543212', createdAt: new Date().toISOString() },
-    { id: 'usr-4', name: 'Priya Joshi (Member)', email: 'priya@gp2026.com', role: 'MEMBER', flatNo: 'A-101', phone: '+919876543213', createdAt: new Date().toISOString() },
-    { id: 'usr-5', name: 'Vikram Singh (Member)', email: 'vikram@gp2026.com', role: 'MEMBER', flatNo: 'B-205', phone: '+919876543214', createdAt: new Date().toISOString() }
   ],
+  roleAssignments: {
+    [SUPER_ADMIN_EMAIL]: { email: SUPER_ADMIN_EMAIL, role: 'SUPER_ADMIN', assignedBy: 'SYSTEM', updatedAt: new Date().toISOString() },
+    'treasurer@gp2026.com': { email: 'treasurer@gp2026.com', role: 'TREASURER', assignedBy: SUPER_ADMIN_EMAIL, updatedAt: new Date().toISOString() },
+    'collector1@gp2026.com': { email: 'collector1@gp2026.com', role: 'COLLECTOR', assignedBy: SUPER_ADMIN_EMAIL, updatedAt: new Date().toISOString() }
+  },
   contributions: [
     { id: 'cnt-1', amount: 5000, paymentMode: 'CASH', receiptNo: 'REC-2026-001', note: 'Full annual chanda', date: new Date().toISOString(), memberId: 'usr-4', memberName: 'Priya Joshi', memberFlat: 'A-101', collectorId: 'usr-2', collectorName: 'Amit Patel' },
     { id: 'cnt-2', amount: 3500, paymentMode: 'UPI', receiptNo: 'REC-2026-002', note: 'Partial payment', date: new Date().toISOString(), memberId: 'usr-5', memberName: 'Vikram Singh', memberFlat: 'B-205', collectorId: 'usr-1', collectorName: 'Rajesh Sharma' }
@@ -90,7 +103,11 @@ export function getDb(): DatabaseSchema {
   }
   try {
     const raw = fs.readFileSync(dbPath, 'utf8');
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!parsed.roleAssignments) {
+      parsed.roleAssignments = initialData.roleAssignments;
+    }
+    return parsed;
   } catch {
     return initialData;
   }
@@ -101,4 +118,18 @@ export function saveDb(data: DatabaseSchema) {
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   }
   fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
+}
+
+export function getUserRole(email: string | null | undefined): 'SUPER_ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER' | 'VIEW_ONLY' {
+  if (!email) return 'VIEW_ONLY';
+  if (email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return 'SUPER_ADMIN';
+
+  const db = getDb();
+  const assignment = db.roleAssignments[email.toLowerCase()];
+  if (assignment) {
+    return assignment.role;
+  }
+
+  // Default for first-time login
+  return 'VIEW_ONLY';
 }

@@ -5,16 +5,16 @@ import { useSession, signIn, signOut } from 'next-auth/react';
 import { 
   Wallet, 
   TrendingDown, 
-  ArrowUpRight, 
   Clock, 
   PlusCircle, 
   Share2, 
   Download, 
   Printer, 
   LogOut,
-  ShieldCheck,
   Lock,
-  UserCheck
+  UserCheck,
+  ShieldCheck,
+  Users
 } from 'lucide-react';
 
 interface FinanceSummary {
@@ -69,15 +69,28 @@ interface Expense {
   paidByName: string;
 }
 
+interface RoleAssignment {
+  email: string;
+  role: string;
+  assignedBy: string;
+  updatedAt: string;
+}
+
 export default function HomePage() {
   const { data: session, status } = useSession();
-  const [activeTab, setActiveTab] = useState<'overview' | 'collectors' | 'contributions' | 'expenses'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'collectors' | 'contributions' | 'expenses' | 'admin'>('overview');
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [collectorBalances, setCollectorBalances] = useState<CollectorBalance[]>([]);
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [handovers, setHandovers] = useState<Handover[]>([]);
+
+  // Super Admin Role Management state
+  const [roleAssignments, setRoleAssignments] = useState<RoleAssignment[]>([]);
+  const [targetEmail, setTargetEmail] = useState('');
+  const [selectedRole, setSelectedRole] = useState<'SUPER_ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER' | 'VIEW_ONLY'>('COLLECTOR');
+  const [roleMsg, setRoleMsg] = useState('');
 
   // Modals & Selected Receipt
   const [showAddContribution, setShowAddContribution] = useState(false);
@@ -91,8 +104,6 @@ export default function HomePage() {
     memberFlat: '',
     amount: '',
     paymentMode: 'CASH' as 'CASH' | 'UPI' | 'BANK_TRANSFER',
-    collectorId: 'usr-2',
-    collectorName: 'Amit Patel (Collector)',
     note: ''
   });
 
@@ -100,14 +111,10 @@ export default function HomePage() {
     title: '',
     category: 'General',
     amount: '',
-    isOutofPocket: true,
-    paidById: 'usr-2',
-    paidByName: 'Amit Patel'
+    isOutofPocket: true
   });
 
   const [handoverForm, setHandoverForm] = useState({
-    collectorId: 'usr-2',
-    collectorName: 'Amit Patel',
     amount: '',
     notes: ''
   });
@@ -129,11 +136,50 @@ export default function HomePage() {
     }
   };
 
+  const fetchRoleAssignments = async () => {
+    try {
+      const res = await fetch('/api/admin/roles');
+      if (res.ok) {
+        const data = await res.json();
+        setRoleAssignments(data.roleAssignments || []);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     if (session) {
       fetchFinanceData();
+      if ((session.user as any)?.role === 'SUPER_ADMIN') {
+        fetchRoleAssignments();
+      }
     }
   }, [session]);
+
+  const handleAssignRole = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetEmail) return;
+
+    setRoleMsg('');
+    const res = await fetch('/api/admin/roles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        targetEmail,
+        newRole: selectedRole
+      })
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      setRoleMsg(`Successfully updated role for ${targetEmail} to ${selectedRole}`);
+      setTargetEmail('');
+      fetchRoleAssignments();
+    } else {
+      setRoleMsg(`Error: ${data.error || 'Failed to update role'}`);
+    }
+  };
 
   const handleAddContribution = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,18 +196,22 @@ export default function HomePage() {
           amount: parseFloat(contribForm.amount),
           paymentMode: contribForm.paymentMode,
           collectorId: session?.user?.email || 'usr-2',
-          collectorName: session?.user?.name || 'Authorized Collector',
+          collectorName: session?.user?.name || 'Collector',
           note: contribForm.note
         }
       })
     });
 
     const result = await res.json();
-    setShowAddContribution(false);
-    setContribForm({ memberName: '', memberFlat: '', amount: '', paymentMode: 'CASH', collectorId: 'usr-2', collectorName: 'Amit Patel (Collector)', note: '' });
-    fetchFinanceData();
-    if (result?.item) {
-      setSelectedReceipt(result.item);
+    if (res.ok) {
+      setShowAddContribution(false);
+      setContribForm({ memberName: '', memberFlat: '', amount: '', paymentMode: 'CASH', note: '' });
+      fetchFinanceData();
+      if (result?.item) {
+        setSelectedReceipt(result.item);
+      }
+    } else {
+      alert(result.error || 'Operation failed');
     }
   };
 
@@ -169,7 +219,7 @@ export default function HomePage() {
     e.preventDefault();
     if (!expenseForm.title || !expenseForm.amount) return;
 
-    await fetch('/api/finance', {
+    const res = await fetch('/api/finance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -185,16 +235,21 @@ export default function HomePage() {
       })
     });
 
-    setShowAddExpense(false);
-    setExpenseForm({ title: '', category: 'General', amount: '', isOutofPocket: true, paidById: 'usr-2', paidByName: 'Amit Patel' });
-    fetchFinanceData();
+    const result = await res.json();
+    if (res.ok) {
+      setShowAddExpense(false);
+      setExpenseForm({ title: '', category: 'General', amount: '', isOutofPocket: true });
+      fetchFinanceData();
+    } else {
+      alert(result.error || 'Operation failed');
+    }
   };
 
   const handleAddHandover = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!handoverForm.amount) return;
 
-    await fetch('/api/finance', {
+    const res = await fetch('/api/finance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -208,13 +263,18 @@ export default function HomePage() {
       })
     });
 
-    setShowAddHandover(false);
-    setHandoverForm({ collectorId: 'usr-2', collectorName: 'Amit Patel', amount: '', notes: '' });
-    fetchFinanceData();
+    const result = await res.json();
+    if (res.ok) {
+      setShowAddHandover(false);
+      setHandoverForm({ amount: '', notes: '' });
+      fetchFinanceData();
+    } else {
+      alert(result.error || 'Operation failed');
+    }
   };
 
   const handleApproveHandover = async (handoverId: string) => {
-    await fetch('/api/finance', {
+    const res = await fetch('/api/finance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -222,11 +282,13 @@ export default function HomePage() {
         data: { handoverId, treasurerId: session?.user?.email || 'usr-1' }
       })
     });
-    fetchFinanceData();
+    const result = await res.json();
+    if (res.ok) fetchFinanceData();
+    else alert(result.error);
   };
 
   const handleSettleReimbursement = async (expenseId: string) => {
-    await fetch('/api/finance', {
+    const res = await fetch('/api/finance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -234,7 +296,9 @@ export default function HomePage() {
         data: { expenseId }
       })
     });
-    fetchFinanceData();
+    const result = await res.json();
+    if (res.ok) fetchFinanceData();
+    else alert(result.error);
   };
 
   const generateWhatsAppShare = (c: Contribution) => {
@@ -251,7 +315,6 @@ export default function HomePage() {
     return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
   };
 
-  // User session checking loading state
   if (status === 'loading') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-3">
@@ -261,7 +324,7 @@ export default function HomePage() {
     );
   }
 
-  // Mandatory Google OAuth Login Screen for Unauthenticated Users
+  // Mandatory Google OAuth Login Screen
   if (!session) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] px-4 text-center space-y-5">
@@ -299,7 +362,13 @@ export default function HomePage() {
     );
   }
 
-  const userRole = (session?.user as any)?.role || 'MEMBER';
+  const userRole = (session?.user as any)?.role || 'VIEW_ONLY';
+  const isSuperAdmin = userRole === 'SUPER_ADMIN';
+  const isTreasurer = userRole === 'TREASURER' || isSuperAdmin;
+  const isCollector = userRole === 'COLLECTOR' || isTreasurer;
+  const isMember = userRole === 'MEMBER' || isCollector;
+  const isViewOnly = userRole === 'VIEW_ONLY';
+
   const targetProgress = summary ? Math.min(100, Math.round((summary.totalCollected / summary.targetGoal) * 100)) : 0;
 
   return (
@@ -316,7 +385,7 @@ export default function HomePage() {
           )}
           <div>
             <p className="font-bold text-slate-200 leading-none">{session.user?.name}</p>
-            <span className="text-[9px] px-1.5 py-0.2 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30 font-medium">
+            <span className={`text-[9px] px-1.5 py-0.2 rounded border font-medium ${isViewOnly ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-orange-500/20 text-orange-400 border-orange-500/30'}`}>
               Role: {userRole}
             </span>
           </div>
@@ -329,6 +398,16 @@ export default function HomePage() {
           <span>Sign Out</span>
         </button>
       </div>
+
+      {/* VIEW_ONLY Warning Banner */}
+      {isViewOnly && (
+        <div className="bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl text-xs text-amber-300 flex items-center space-x-2">
+          <Lock className="w-4 h-4 flex-shrink-0 text-amber-400" />
+          <p className="text-[11px]">
+            You have <strong>VIEW_ONLY</strong> access. Contact Super Admin (<code className="text-amber-200 font-mono">luhurenbaiclub@gmail.com</code>) to request elevated role permissions.
+          </p>
+        </div>
+      )}
 
       {/* Target Goal & Quick Actions Header */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
@@ -352,22 +431,38 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons - Role Scoped */}
         <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-800/80">
-          <button 
-            onClick={() => setShowAddContribution(true)}
-            className="flex flex-col items-center justify-center p-2 rounded-xl bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/30 text-orange-300 text-[11px] font-medium transition"
-          >
-            <PlusCircle className="w-4 h-4 mb-1 text-orange-400" />
-            + Collection
-          </button>
-          <button 
-            onClick={() => setShowAddExpense(true)}
-            className="flex flex-col items-center justify-center p-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-rose-300 text-[11px] font-medium transition"
-          >
-            <TrendingDown className="w-4 h-4 mb-1 text-rose-400" />
-            + Spend / Bill
-          </button>
+          {isCollector ? (
+            <button 
+              onClick={() => setShowAddContribution(true)}
+              className="flex flex-col items-center justify-center p-2 rounded-xl bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/30 text-orange-300 text-[11px] font-medium transition"
+            >
+              <PlusCircle className="w-4 h-4 mb-1 text-orange-400" />
+              + Collection
+            </button>
+          ) : (
+            <div className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-800/40 border border-slate-800 text-slate-600 text-[11px] font-medium cursor-not-allowed">
+              <Lock className="w-4 h-4 mb-1 text-slate-600" />
+              + Collection
+            </div>
+          )}
+
+          {isMember ? (
+            <button 
+              onClick={() => setShowAddExpense(true)}
+              className="flex flex-col items-center justify-center p-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-rose-300 text-[11px] font-medium transition"
+            >
+              <TrendingDown className="w-4 h-4 mb-1 text-rose-400" />
+              + Spend / Bill
+            </button>
+          ) : (
+            <div className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-800/40 border border-slate-800 text-slate-600 text-[11px] font-medium cursor-not-allowed">
+              <Lock className="w-4 h-4 mb-1 text-slate-600" />
+              + Spend / Bill
+            </div>
+          )}
+
           <a 
             href="/api/finance?format=csv"
             className="flex flex-col items-center justify-center p-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 text-[11px] font-medium transition"
@@ -404,6 +499,15 @@ export default function HomePage() {
         >
           Expenses
         </button>
+
+        {isSuperAdmin && (
+          <button 
+            onClick={() => setActiveTab('admin')} 
+            className={`flex-1 py-2 px-3 rounded-lg text-center whitespace-nowrap transition ${activeTab === 'admin' ? 'bg-purple-600 text-white font-bold shadow' : 'text-purple-400 hover:text-purple-200'}`}
+          >
+            User Roles
+          </button>
+        )}
       </div>
 
       {/* TAB CONTENT: Overview */}
@@ -467,12 +571,14 @@ export default function HomePage() {
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-md space-y-3">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Collector Cash Balances</h3>
-              <button 
-                onClick={() => setShowAddHandover(true)}
-                className="text-xs px-2.5 py-1 rounded bg-cyan-600 text-white font-medium shadow"
-              >
-                + Handover Cash
-              </button>
+              {isCollector && (
+                <button 
+                  onClick={() => setShowAddHandover(true)}
+                  className="text-xs px-2.5 py-1 rounded bg-cyan-600 text-white font-medium shadow"
+                >
+                  + Handover Cash
+                </button>
+              )}
             </div>
             <div className="divide-y divide-slate-800">
               {collectorBalances.map((col) => (
@@ -507,7 +613,7 @@ export default function HomePage() {
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-amber-400 mb-1.5">₹{h.amount.toLocaleString()}</p>
-                      {h.status === 'PENDING' && (userRole === 'ADMIN' || userRole === 'TREASURER') && (
+                      {h.status === 'PENDING' && isTreasurer && (
                         <button 
                           onClick={() => handleApproveHandover(h.id)}
                           className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold shadow"
@@ -529,12 +635,14 @@ export default function HomePage() {
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-md space-y-3">
           <div className="flex justify-between items-center">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">All Collections Logged</h3>
-            <button 
-              onClick={() => setShowAddContribution(true)}
-              className="text-xs px-2.5 py-1 rounded bg-orange-600 text-white font-medium shadow"
-            >
-              + Record
-            </button>
+            {isCollector && (
+              <button 
+                onClick={() => setShowAddContribution(true)}
+                className="text-xs px-2.5 py-1 rounded bg-orange-600 text-white font-medium shadow"
+              >
+                + Record
+              </button>
+            )}
           </div>
           <div className="divide-y divide-slate-800">
             {contributions.map((c) => (
@@ -571,12 +679,14 @@ export default function HomePage() {
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-md space-y-3">
           <div className="flex justify-between items-center">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Puja Expenses & Out-of-Pocket</h3>
-            <button 
-              onClick={() => setShowAddExpense(true)}
-              className="text-xs px-2.5 py-1 rounded bg-rose-600 text-white font-medium shadow"
-            >
-              + Record Spend
-            </button>
+            {isMember && (
+              <button 
+                onClick={() => setShowAddExpense(true)}
+                className="text-xs px-2.5 py-1 rounded bg-rose-600 text-white font-medium shadow"
+              >
+                + Record Spend
+              </button>
+            )}
           </div>
           <div className="divide-y divide-slate-800">
             {expenses.map((exp) => (
@@ -595,7 +705,7 @@ export default function HomePage() {
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-rose-400 text-sm">₹{exp.amount.toLocaleString()}</p>
-                  {exp.isOutofPocket && !exp.isReimbursed && (userRole === 'ADMIN' || userRole === 'TREASURER') && (
+                  {exp.isOutofPocket && !exp.isReimbursed && isTreasurer && (
                     <button 
                       onClick={() => handleSettleReimbursement(exp.id)}
                       className="mt-1 px-2 py-0.5 rounded bg-purple-600 hover:bg-purple-500 text-white text-[9px] font-bold"
@@ -606,6 +716,75 @@ export default function HomePage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT: Super Admin Panel */}
+      {activeTab === 'admin' && isSuperAdmin && (
+        <div className="bg-slate-900 border border-purple-500/30 rounded-xl p-3 shadow-md space-y-4">
+          <div className="flex items-center space-x-2">
+            <ShieldCheck className="w-5 h-5 text-purple-400" />
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-purple-300">Super Admin User Role Console</h3>
+              <p className="text-[10px] text-slate-400">Promote members or assign custom permissions securely</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleAssignRole} className="space-y-2.5 text-xs bg-slate-850 p-3 rounded-xl border border-slate-800">
+            <div>
+              <label className="block text-slate-400 mb-1">User Email Address</label>
+              <input 
+                type="email" 
+                placeholder="e.g. member@gmail.com"
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-purple-500"
+                value={targetEmail}
+                onChange={(e) => setTargetEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-400 mb-1">Assign Target Role</label>
+              <select 
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-purple-500 font-bold"
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value as any)}
+              >
+                <option value="COLLECTOR">COLLECTOR (Collect Cash & UPI)</option>
+                <option value="TREASURER">TREASURER (Approve Handovers & Reimbursements)</option>
+                <option value="MEMBER">MEMBER (Submit Expenses & View Receipts)</option>
+                <option value="VIEW_ONLY">VIEW_ONLY (Read-Only Access)</option>
+                <option value="SUPER_ADMIN">SUPER_ADMIN (Full Control)</option>
+              </select>
+            </div>
+
+            <button type="submit" className="w-full py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold transition">
+              Save Role Assignment
+            </button>
+
+            {roleMsg && (
+              <p className={`text-[11px] p-2 rounded text-center ${roleMsg.startsWith('Error') ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                {roleMsg}
+              </p>
+            )}
+          </form>
+
+          <div className="space-y-2">
+            <h4 className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Current Role Registry</h4>
+            <div className="divide-y divide-slate-800 text-xs">
+              {roleAssignments.map((ra) => (
+                <div key={ra.email} className="py-2 flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-slate-200">{ra.email}</p>
+                    <p className="text-[10px] text-slate-500">Assigned by {ra.assignedBy}</p>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                    {ra.role}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

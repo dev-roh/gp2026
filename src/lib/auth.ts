@@ -1,5 +1,6 @@
 import NextAuth, { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
+import { getUserRole } from '@/lib/db';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -9,12 +10,15 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    async jwt({ token, user, trigger, session }) {
+      if (token?.email) {
+        token.role = getUserRole(token.email);
+      }
+      return token;
+    },
     async session({ session, token }) {
       if (session?.user) {
-        const adminEmails = (process.env.ADMIN_EMAILS || '').split(',');
-        (session.user as any).role = adminEmails.includes(session.user.email || '') 
-          ? 'ADMIN' 
-          : 'MEMBER';
+        (session.user as any).role = token.role || getUserRole(session.user.email);
       }
       return session;
     },
