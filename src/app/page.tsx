@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useSession, signIn, signOut } from 'next-auth/react';
 import { 
   Wallet, 
   TrendingDown, 
@@ -10,7 +11,10 @@ import {
   Share2, 
   Download, 
   Printer, 
-  CheckCircle2
+  LogOut,
+  ShieldCheck,
+  Lock,
+  UserCheck
 } from 'lucide-react';
 
 interface FinanceSummary {
@@ -66,6 +70,7 @@ interface Expense {
 }
 
 export default function HomePage() {
+  const { data: session, status } = useSession();
   const [activeTab, setActiveTab] = useState<'overview' | 'collectors' | 'contributions' | 'expenses'>('overview');
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
@@ -125,8 +130,10 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    fetchFinanceData();
-  }, []);
+    if (session) {
+      fetchFinanceData();
+    }
+  }, [session]);
 
   const handleAddContribution = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,8 +149,8 @@ export default function HomePage() {
           memberFlat: contribForm.memberFlat || 'N/A',
           amount: parseFloat(contribForm.amount),
           paymentMode: contribForm.paymentMode,
-          collectorId: contribForm.collectorId,
-          collectorName: contribForm.collectorName,
+          collectorId: session?.user?.email || 'usr-2',
+          collectorName: session?.user?.name || 'Authorized Collector',
           note: contribForm.note
         }
       })
@@ -172,8 +179,8 @@ export default function HomePage() {
           category: expenseForm.category,
           amount: parseFloat(expenseForm.amount),
           isOutofPocket: expenseForm.isOutofPocket,
-          paidById: expenseForm.paidById,
-          paidByName: expenseForm.paidByName
+          paidById: session?.user?.email || 'usr-2',
+          paidByName: session?.user?.name || 'Member'
         }
       })
     });
@@ -193,8 +200,8 @@ export default function HomePage() {
       body: JSON.stringify({
         type: 'REQUEST_HANDOVER',
         data: {
-          collectorId: handoverForm.collectorId,
-          collectorName: handoverForm.collectorName,
+          collectorId: session?.user?.email || 'usr-2',
+          collectorName: session?.user?.name || 'Collector',
           amount: parseFloat(handoverForm.amount),
           notes: handoverForm.notes
         }
@@ -212,7 +219,7 @@ export default function HomePage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type: 'APPROVE_HANDOVER',
-        data: { handoverId, treasurerId: 'usr-1' }
+        data: { handoverId, treasurerId: session?.user?.email || 'usr-1' }
       })
     });
     fetchFinanceData();
@@ -244,10 +251,85 @@ export default function HomePage() {
     return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
   };
 
+  // User session checking loading state
+  if (status === 'loading') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-3">
+        <div className="w-8 h-8 rounded-full border-2 border-orange-500 border-t-transparent animate-spin"></div>
+        <p className="text-xs text-slate-400 font-medium">Verifying security credentials...</p>
+      </div>
+    );
+  }
+
+  // Mandatory Google OAuth Login Screen for Unauthenticated Users
+  if (!session) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70vh] px-4 text-center space-y-5">
+        <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center font-bold text-3xl text-slate-950 shadow-2xl animate-bounce">
+          🐘
+        </div>
+
+        <div className="space-y-1">
+          <h2 className="text-xl font-extrabold text-slate-100">Ganesh Puja 2026</h2>
+          <p className="text-xs text-orange-400 font-semibold uppercase tracking-wider">Financial Transparency Portal</p>
+          <p className="text-[11px] text-slate-400 max-w-xs pt-1">
+            Access to collection records, treasury vaults, and reimbursement ledgers is restricted to verified members.
+          </p>
+        </div>
+
+        <div className="w-full max-w-xs bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4">
+          <div className="flex items-center justify-center space-x-2 text-emerald-400 text-xs font-medium">
+            <Lock className="w-4 h-4" />
+            <span>Google OAuth 2.0 Protection</span>
+          </div>
+
+          <button
+            onClick={() => signIn('google')}
+            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-slate-950 font-extrabold text-xs shadow-lg flex items-center justify-center space-x-2 transition transform active:scale-95"
+          >
+            <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+              <path d="M12.24 10.285V13.4h6.887c-.58 3.424-3.57 5.767-6.887 5.767-4.12 0-7.464-3.344-7.464-7.464S8.12 4.238 12.24 4.238c1.86 0 3.55.674 4.86 1.785l2.454-2.453C17.754 1.83 15.16.8 12.24.8 6.03.8 1 5.83 1 12.04s5.03 11.24 11.24 11.24c6.49 0 10.8-4.56 10.8-10.98 0-.74-.08-1.46-.2-2.015H12.24z"/>
+            </svg>
+            <span>Sign in with Google Account</span>
+          </button>
+
+          <p className="text-[10px] text-slate-500">Authorized redirect: gp2026.luhurachati.com</p>
+        </div>
+      </div>
+    );
+  }
+
+  const userRole = (session?.user as any)?.role || 'MEMBER';
   const targetProgress = summary ? Math.min(100, Math.round((summary.totalCollected / summary.targetGoal) * 100)) : 0;
 
   return (
     <div className="space-y-4">
+      {/* Authenticated User Header Banner */}
+      <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs">
+        <div className="flex items-center space-x-2">
+          {session.user?.image ? (
+            <img src={session.user.image} alt="User avatar" className="w-7 h-7 rounded-full border border-orange-500/50" />
+          ) : (
+            <div className="w-7 h-7 rounded-full bg-orange-600 flex items-center justify-center font-bold text-slate-950 text-xs">
+              {session.user?.name?.charAt(0) || 'U'}
+            </div>
+          )}
+          <div>
+            <p className="font-bold text-slate-200 leading-none">{session.user?.name}</p>
+            <span className="text-[9px] px-1.5 py-0.2 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30 font-medium">
+              Role: {userRole}
+            </span>
+          </div>
+        </div>
+        <button 
+          onClick={() => signOut()}
+          className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-[11px] font-medium transition"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          <span>Sign Out</span>
+        </button>
+      </div>
+
       {/* Target Goal & Quick Actions Header */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
         <div className="flex justify-between items-center mb-2">
@@ -425,7 +507,7 @@ export default function HomePage() {
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-amber-400 mb-1.5">₹{h.amount.toLocaleString()}</p>
-                      {h.status === 'PENDING' && (
+                      {h.status === 'PENDING' && (userRole === 'ADMIN' || userRole === 'TREASURER') && (
                         <button 
                           onClick={() => handleApproveHandover(h.id)}
                           className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold shadow"
@@ -513,7 +595,7 @@ export default function HomePage() {
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-rose-400 text-sm">₹{exp.amount.toLocaleString()}</p>
-                  {exp.isOutofPocket && !exp.isReimbursed && (
+                  {exp.isOutofPocket && !exp.isReimbursed && (userRole === 'ADMIN' || userRole === 'TREASURER') && (
                     <button 
                       onClick={() => handleSettleReimbursement(exp.id)}
                       className="mt-1 px-2 py-0.5 rounded bg-purple-600 hover:bg-purple-500 text-white text-[9px] font-bold"
