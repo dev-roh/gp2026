@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import NextAuthProvider from '@/components/Providers';
+import PwaInstallHeader from '@/components/PwaInstallHeader';
 
 export const metadata: Metadata = {
   title: 'Ganesh Puja 2026 - Finance Portal',
@@ -38,12 +39,7 @@ export default function RootLayout({
                 <p className="text-[10px] text-orange-600 font-semibold tracking-wide uppercase pt-0.5">Festive Portal 2026</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold shadow-xs">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                PWA Ready
-              </span>
-            </div>
+            <PwaInstallHeader />
           </header>
 
           <main className="max-w-md md:max-w-4xl lg:max-w-6xl mx-auto px-4 py-4 space-y-4">
