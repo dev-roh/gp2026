@@ -453,6 +453,25 @@ export default function HomePage() {
     else alert(result.error);
   };
 
+  const handleResetDatabase = async () => {
+    if (!confirm('Are you sure you want to delete ALL test contributions, expenses, handovers, and reset the application for a fresh start? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/roles', { method: 'DELETE' });
+      const result = await res.json();
+      if (res.ok) {
+        alert('Database successfully reset for a fresh start!');
+        fetchFinanceData();
+      } else {
+        alert(result.error || 'Failed to reset database.');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error occurred while resetting database.');
+    }
+  };
+
   const generateWhatsAppShare = (c: Contribution) => {
     const text = `*${settings.appTitle} Payment Receipt* 🐘\n\n` +
       `Receipt No: *${c.receiptNo}*\n` +
@@ -1139,6 +1158,21 @@ export default function HomePage() {
               </p>
             )}
           </form>
+
+          {/* Super Admin Fresh Start Reset Button */}
+          <div className="bg-rose-950/40 border border-rose-800/40 rounded-xl p-3 space-y-2">
+            <h4 className="font-extrabold text-rose-400 text-xs">⚠️ Fresh Start Data Reset</h4>
+            <p className="text-[10px] text-slate-400">
+              Clear all test contributions, expenses, handovers, and non-admin accounts to prepare the application for official production launch.
+            </p>
+            <button
+              type="button"
+              onClick={handleResetDatabase}
+              className="w-full py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-md transition"
+            >
+              Reset Application Database (Fresh Start)
+            </button>
+          </div>
         </div>
       )}
 

@@ -119,27 +119,15 @@ const defaultSettings: AppSettings = {
 const initialData: DatabaseSchema = {
   settings: defaultSettings,
   users: [
-    { id: 'usr-0', name: 'Super Admin', email: SUPER_ADMIN_EMAIL, role: 'SUPER_ADMIN', area: 'Admin Central', phone: '+919999999999', createdAt: new Date().toISOString() },
-    { id: 'usr-1', name: 'Rajesh Sharma (Treasurer)', email: 'treasurer@gp2026.com', role: 'TREASURER', area: 'Wing A', phone: '+919876543210', createdAt: new Date().toISOString() },
-    { id: 'usr-2', name: 'Amit Patel (Collector)', email: 'collector1@gp2026.com', role: 'COLLECTOR', area: 'Wing B', phone: '+919876543211', createdAt: new Date().toISOString() },
+    { id: 'usr-0', name: 'Super Admin', email: SUPER_ADMIN_EMAIL, role: 'SUPER_ADMIN', area: 'Admin Central', phone: '+919999999999', createdAt: new Date().toISOString() }
   ],
   roleAssignments: {
-    [SUPER_ADMIN_EMAIL]: { email: SUPER_ADMIN_EMAIL, role: 'SUPER_ADMIN', assignedBy: 'SYSTEM', updatedAt: new Date().toISOString() },
-    'treasurer@gp2026.com': { email: 'treasurer@gp2026.com', role: 'TREASURER', assignedBy: SUPER_ADMIN_EMAIL, updatedAt: new Date().toISOString() },
-    'collector1@gp2026.com': { email: 'collector1@gp2026.com', role: 'COLLECTOR', assignedBy: SUPER_ADMIN_EMAIL, updatedAt: new Date().toISOString() }
+    [SUPER_ADMIN_EMAIL]: { email: SUPER_ADMIN_EMAIL, role: 'SUPER_ADMIN', assignedBy: 'SYSTEM', updatedAt: new Date().toISOString() }
   },
-  contributions: [
-    { id: 'cnt-1', amount: 5000, paymentMode: 'CASH', receiptNo: 'REC-2026-001', note: 'Full annual chanda', date: new Date().toISOString(), memberId: 'usr-4', memberName: 'Priya Joshi', memberArea: 'Sector 1 / Wing A', collectorId: 'usr-2', collectorName: 'Amit Patel', status: 'APPROVED' },
-    { id: 'cnt-2', amount: 3500, paymentMode: 'UPI', receiptNo: 'REC-2026-002', note: 'Partial payment', date: new Date().toISOString(), memberId: 'usr-5', memberName: 'Vikram Singh', memberArea: 'Sector 2 / Wing B', collectorId: 'usr-1', collectorName: 'Rajesh Sharma', status: 'APPROVED' }
-  ],
+  contributions: [],
   notifications: [],
-  handovers: [
-    { id: 'hnd-1', amount: 5000, status: 'PENDING', notes: 'Cash collected from Sector 1 / Wing A', date: new Date().toISOString(), collectorId: 'usr-2', collectorName: 'Amit Patel', collectorArea: 'Sector 1 / Wing A' }
-  ],
-  expenses: [
-    { id: 'exp-1', title: 'Pandal Advance Payment', category: 'Decoration', amount: 12000, isOutofPocket: false, isReimbursed: false, date: new Date().toISOString(), paidById: 'usr-1', paidByName: 'Rajesh Sharma' },
-    { id: 'exp-2', title: 'Flower Garland & Puja Items', category: 'Puja Rituals', amount: 2400, isOutofPocket: true, isReimbursed: false, date: new Date().toISOString(), paidById: 'usr-2', paidByName: 'Amit Patel' }
-  ]
+  handovers: [],
+  expenses: []
 };
 
 export function getDb(): DatabaseSchema {
