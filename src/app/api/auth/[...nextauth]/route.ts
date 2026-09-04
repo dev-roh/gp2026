@@ -11,13 +11,19 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async session({ session, token }) {
       if (session?.user) {
-        // Default role assignment based on admin email list or standard user
         const adminEmails = (process.env.ADMIN_EMAILS || '').split(',');
         (session.user as any).role = adminEmails.includes(session.user.email || '') 
           ? 'ADMIN' 
           : 'MEMBER';
       }
       return session;
+    },
+    async redirect({ url, baseUrl }) {
+      // Allows relative callback URLs
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      // Allows callback URLs on the same origin (gp2026.luhurachati.com)
+      else if (new URL(url).origin === baseUrl) return url;
+      return baseUrl;
     },
   },
   pages: {
