@@ -630,6 +630,11 @@ export default function HomePage() {
           </button>
 
           <p className="text-[10px] text-slate-500">Authorized redirect: {settings.subTitle}</p>
+          <div className="pt-2 border-t border-slate-800 text-[10px] text-slate-400 flex justify-center space-x-3">
+            <a href="/privacy" className="hover:text-orange-400 underline">Privacy Policy</a>
+            <span>•</span>
+            <a href="/terms" className="hover:text-orange-400 underline">Terms & Disclaimer</a>
+          </div>
         </div>
       </div>
     );
@@ -918,6 +923,10 @@ export default function HomePage() {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
       {/* TAB CONTENT: Schedule & Media (Programmes) */}
       {activeTab === 'programmes' && (
         <div className="space-y-4">

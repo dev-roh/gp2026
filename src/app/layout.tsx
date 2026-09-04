@@ -49,6 +49,17 @@ export default function RootLayout({
           <main className="max-w-md md:max-w-4xl lg:max-w-6xl mx-auto px-4 py-4 space-y-4">
             {children}
           </main>
+
+          <footer className="max-w-md md:max-w-4xl lg:max-w-6xl mx-auto px-4 py-6 border-t border-slate-900 text-center text-xs text-slate-500 space-y-2">
+            <p>© 2026 Ganesh Puja Committee (gp2026.luhurachati.com). All rights reserved.</p>
+            <div className="flex justify-center space-x-4 text-[11px] font-medium text-slate-400">
+              <a href="/privacy" className="hover:text-orange-400 underline">Privacy Policy</a>
+              <span>•</span>
+              <a href="/terms" className="hover:text-orange-400 underline">Terms of Service & Financial Disclaimer</a>
+              <span>•</span>
+              <a href="mailto:luhurenbaiclub@gmail.com" className="hover:text-orange-400 underline">Support Contact</a>
+            </div>
+          </footer>
         </NextAuthProvider>
       </body>
     </html>
