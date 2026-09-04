@@ -95,7 +95,8 @@ export interface DatabaseSchema {
   expenses: Expense[];
 }
 
-const dbPath = path.join(process.cwd(), 'data', 'db.json');
+const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+const dbPath = isVercel ? path.join('/tmp', 'db.json') : path.join(process.cwd(), 'data', 'db.json');
 
 const SUPER_ADMIN_EMAIL = 'luhurenbaiclub@gmail.com';
 
@@ -138,30 +139,35 @@ const initialData: DatabaseSchema = {
 };
 
 export function getDb(): DatabaseSchema {
-  if (!fs.existsSync(path.dirname(dbPath))) {
-    fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-  }
-  if (!fs.existsSync(dbPath)) {
-    fs.writeFileSync(dbPath, JSON.stringify(initialData, null, 2));
-    return initialData;
-  }
   try {
+    if (!fs.existsSync(path.dirname(dbPath))) {
+      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+    }
+    if (!fs.existsSync(dbPath)) {
+      fs.writeFileSync(dbPath, JSON.stringify(initialData, null, 2));
+      return initialData;
+    }
     const raw = fs.readFileSync(dbPath, 'utf8');
     const parsed = JSON.parse(raw);
     if (!parsed.settings) parsed.settings = defaultSettings;
     if (!parsed.roleAssignments) parsed.roleAssignments = initialData.roleAssignments;
     if (!parsed.notifications) parsed.notifications = [];
     return parsed;
-  } catch {
+  } catch (err) {
+    console.error('getDb filesystem error:', err);
     return initialData;
   }
 }
 
 export function saveDb(data: DatabaseSchema) {
-  if (!fs.existsSync(path.dirname(dbPath))) {
-    fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+  try {
+    if (!fs.existsSync(path.dirname(dbPath))) {
+      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+    }
+    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.error('saveDb filesystem error:', err);
   }
-  fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
 }
 
 export function getUserRole(email: string | null | undefined): 'SUPER_ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER' | 'VIEW_ONLY' {
@@ -194,11 +200,30 @@ export function registerOrUpdateUser(name: string, email: string, image?: string
       createdAt: new Date().toISOString()
     };
     db.users.push(user);
+
+    // Auto-link any historical contributions where memberName matches exact registered name
+    let updatedContributions = false;
+    db.contributions.forEach(c => {
+      if (c.memberName && c.memberName.trim().toLowerCase() === name.trim().toLowerCase()) {
+        c.memberId = user!.id;
+        updatedContributions = true;
+      }
+    });
+
     saveDb(db);
   } else {
     let updated = false;
     if (name && user.name !== name) { user.name = name; updated = true; }
     if (image && user.image !== image) { user.image = image; updated = true; }
+    
+    // Check if there are any unlinked contributions matching memberName
+    db.contributions.forEach(c => {
+      if (c.memberName && c.memberName.trim().toLowerCase() === name.trim().toLowerCase() && c.memberId !== user!.id) {
+        c.memberId = user!.id;
+        updated = true;
+      }
+    });
+
     if (updated) saveDb(db);
   }
 
