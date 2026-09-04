@@ -174,13 +174,17 @@ const initialData: DatabaseSchema = {
   membershipRequests: []
 };
 
+const dbRecordId = process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production' 
+  ? 'main_production' 
+  : 'main_development';
+
 export async function getDbAsync(): Promise<DatabaseSchema> {
   if (supabase) {
     try {
       const { data, error } = await supabase
         .from('app_db')
         .select('data')
-        .eq('id', 'main')
+        .eq('id', dbRecordId)
         .single();
       
       if (!error && data?.data) {
@@ -203,7 +207,7 @@ export async function saveDbAsync(data: DatabaseSchema): Promise<void> {
     try {
       await supabase
         .from('app_db')
-        .upsert({ id: 'main', data, updated_at: new Date().toISOString() });
+        .upsert({ id: dbRecordId, data, updated_at: new Date().toISOString() });
     } catch (err) {
       console.error('Supabase save error:', err);
     }
