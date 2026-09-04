@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getDb, saveDb, getUserRole } from '@/lib/db';
+import { getDb, saveDb, getUserRole, registerOrUpdateUser } from '@/lib/db';
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -101,7 +101,9 @@ export async function GET(req: Request) {
     notifications: myNotifications,
     latestExpenses: db.expenses.slice().reverse(),
     handovers: db.handovers.slice().reverse(),
-    programmes: (db.programmes || []).slice().reverse()
+    programmes: (db.programmes || []).slice().reverse(),
+    membershipRequests: (db.membershipRequests || []).slice().reverse(),
+    users: db.users
   });
 }
 
@@ -332,6 +334,101 @@ export async function POST(req: Request) {
       db.programmes = db.programmes.filter(p => p.id !== data.programmeId);
       saveDb(db);
       return NextResponse.json({ success: true });
+    }
+
+    // MEMBERSHIP REQUEST WORKFLOW
+    if (type === 'REQUEST_MEMBERSHIP') {
+      const userName = data?.userName || session.user?.name || 'Guest User';
+      const userArea = data?.userArea || 'General Area';
+      
+      if (!db.membershipRequests) db.membershipRequests = [];
+
+      // Check if pending request exists
+      const existingReq = db.membershipRequests.find(r => r.userEmail.toLowerCase() === userEmail.toLowerCase() && r.status === 'PENDING');
+      if (existingReq) {
+        return NextResponse.json({ error: 'You already have a pending membership request. Please wait for Super Admin approval.' }, { status: 400 });
+      }
+
+      const newReq = {
+        id: `mreq-${Date.now()}`,
+        userName,
+        userEmail,
+        userArea,
+        requestedRole: 'MEMBER' as const,
+        status: 'PENDING' as const,
+        createdAt: new Date().toISOString()
+      };
+
+      db.membershipRequests.push(newReq);
+
+      // Push notification for Super Admin
+      if (!db.notifications) db.notifications = [];
+      db.notifications.push({
+        id: `notif-${Date.now()}`,
+        recipientEmail: 'luhurenbaiclub@gmail.com',
+        title: 'New Membership Request 🙋‍♂️',
+        message: `${userName} (${userEmail}) from ${userArea} requested Member upgrade access.`,
+        type: 'MEMBERSHIP_REQUEST',
+        targetId: newReq.id,
+        isRead: false,
+        date: new Date().toISOString()
+      });
+
+      saveDb(db);
+      return NextResponse.json({ success: true, item: newReq });
+    }
+
+    if (type === 'DECIDE_MEMBERSHIP_REQUEST') {
+      if (userRole !== 'SUPER_ADMIN' && userRole !== 'TREASURER') {
+        return NextResponse.json({ error: 'Forbidden. Only Super Admin/Treasurer can approve membership requests.' }, { status: 403 });
+      }
+
+      const { requestId, decision, assignedRole } = data;
+      if (!db.membershipRequests) db.membershipRequests = [];
+
+      const reqIndex = db.membershipRequests.findIndex(r => r.id === requestId);
+      if (reqIndex === -1) {
+        return NextResponse.json({ error: 'Membership request not found.' }, { status: 404 });
+      }
+
+      const targetReq = db.membershipRequests[reqIndex];
+      targetReq.status = decision === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+      targetReq.decidedBy = userEmail;
+      targetReq.decidedAt = new Date().toISOString();
+
+      if (decision === 'APPROVE') {
+        const finalRole = assignedRole || targetReq.requestedRole || 'MEMBER';
+        
+        // 1. Assign role in roleAssignments
+        if (!db.roleAssignments) db.roleAssignments = {};
+        db.roleAssignments[targetReq.userEmail.toLowerCase()] = {
+          email: targetReq.userEmail.toLowerCase(),
+          role: finalRole,
+          assignedBy: userEmail,
+          updatedAt: new Date().toISOString()
+        };
+
+        // 2. Automatically record/update user details in db.users to optimize searches
+        const userObj = registerOrUpdateUser(targetReq.userName, targetReq.userEmail);
+        userObj.role = finalRole;
+        if (targetReq.userArea) userObj.area = targetReq.userArea;
+
+        // 3. Notify the approved user
+        if (!db.notifications) db.notifications = [];
+        db.notifications.push({
+          id: `notif-${Date.now()}`,
+          recipientEmail: targetReq.userEmail,
+          title: 'Membership Request Approved! 🎉',
+          message: `Congratulations! Your membership request has been approved as ${finalRole} by ${session.user?.name || 'Super Admin'}.`,
+          type: 'MEMBERSHIP_APPROVED',
+          targetId: targetReq.id,
+          isRead: false,
+          date: new Date().toISOString()
+        });
+      }
+
+      saveDb(db);
+      return NextResponse.json({ success: true, item: targetReq });
     }
 
     return NextResponse.json({ error: 'Invalid operation type' }, { status: 400 });

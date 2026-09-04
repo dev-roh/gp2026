@@ -43,6 +43,18 @@ interface CollectorBalance {
   pendingHandoverAmount: number;
 }
 
+interface MembershipRequestItem {
+  id: string;
+  userName: string;
+  userEmail: string;
+  userArea?: string;
+  requestedRole: 'MEMBER' | 'COLLECTOR';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
+  decidedBy?: string;
+  decidedAt?: string;
+}
+
 interface Contribution {
   id: string;
   amount: number;
@@ -196,6 +208,11 @@ export default function HomePage() {
     }
   };
 
+  const [membershipRequests, setMembershipRequests] = useState<MembershipRequestItem[]>([]);
+  const [membershipArea, setMembershipArea] = useState('');
+  const [membershipReqMsg, setMembershipReqMsg] = useState('');
+  const [registeredUsers, setRegisteredUsers] = useState<DbUser[]>([]);
+
   const fetchFinanceData = async () => {
     try {
       setLoading(true);
@@ -209,10 +226,54 @@ export default function HomePage() {
       setExpenses(data.latestExpenses);
       setHandovers(data.handovers);
       setProgrammes(data.programmes || []);
+      setMembershipRequests(data.membershipRequests || []);
+      setRegisteredUsers(data.users || []);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRequestMembershipSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMembershipReqMsg('Submitting request...');
+    const res = await fetch('/api/finance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'REQUEST_MEMBERSHIP',
+        data: {
+          userName: session?.user?.name,
+          userArea: membershipArea || 'General Area'
+        }
+      })
+    });
+    const result = await res.json();
+    if (res.ok) {
+      setMembershipReqMsg('✅ Request submitted! Super Admin has been notified for approval.');
+      fetchFinanceData();
+    } else {
+      setMembershipReqMsg(`Error: ${result.error || 'Failed to submit request'}`);
+    }
+  };
+
+  const handleDecideMembershipRequest = async (requestId: string, decision: 'APPROVE' | 'REJECT', assignedRole: string = 'MEMBER') => {
+    const res = await fetch('/api/finance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'DECIDE_MEMBERSHIP_REQUEST',
+        data: { requestId, decision, assignedRole }
+      })
+    });
+    const result = await res.json();
+    if (res.ok) {
+      fetchFinanceData();
+      fetchRoleAssignments();
+      alert(`Membership request ${decision.toLowerCase()}d successfully! User added to database index.`);
+    } else {
+      alert(`Error: ${result.error || 'Failed to update request'}`);
     }
   };
 
@@ -699,7 +760,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* View-Only User Membership Notice */}
+      {/* View-Only User Membership Notice & Active Request Form */}
       {isViewOnly && (
         <div className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-5 shadow-sm space-y-3">
           <div className="flex items-center space-x-3">
@@ -708,24 +769,40 @@ export default function HomePage() {
             </div>
             <div>
               <h3 className="font-extrabold text-slate-900 text-sm">View-Only Guest Access</h3>
-              <p className="text-xs text-slate-600 font-medium">Want to log expenses or contribute as an active member?</p>
+              <p className="text-xs text-slate-600 font-medium">Request official Member access from the Super Admin below</p>
             </div>
           </div>
-          <div className="bg-white border border-amber-200/80 rounded-2xl p-3.5 text-xs text-slate-700 space-y-1.5">
-            <p className="font-semibold text-slate-800">
-              <strong>Notice:</strong> Only designated Area Collectors can record official Chanda collection entries.
+          <div className="bg-white border border-amber-200/80 rounded-2xl p-4 text-xs text-slate-700 space-y-3">
+            <p className="text-slate-600 leading-relaxed font-medium">
+              Only verified members can log expenses or claims. Select your Area / Wing below to submit an active membership request directly to the Super Admin for approval.
             </p>
-            <p className="text-slate-600 leading-relaxed">
-              If you wish to log expenses or get full active status, please ask your Area Collector or Super Admin to assign your email address **Member** access.
-            </p>
-            <div className="pt-1">
-              <a 
-                href="mailto:luhurenbaiclub@gmail.com?subject=Request%20for%20Ganesh%20Puja%20LBC%20Member%20Access" 
-                className="text-orange-600 font-extrabold hover:underline text-xs inline-flex items-center gap-1"
+            
+            <form onSubmit={handleRequestMembershipSubmit} className="flex flex-col sm:flex-row gap-2 items-center">
+              <select
+                className="w-full sm:flex-1 bg-amber-50/50 border border-amber-200 rounded-xl p-2.5 text-xs text-slate-800 font-bold focus:outline-none focus:border-orange-500"
+                value={membershipArea}
+                onChange={(e) => setMembershipArea(e.target.value)}
+                required
               >
-                <span>✉️ Request Membership Access via Email &rarr;</span>
-              </a>
-            </div>
+                <option value="">-- Select Your Area / Wing --</option>
+                {(settings.areaOptions || []).map((area, idx) => (
+                  <option key={idx} value={area}>{area}</option>
+                ))}
+              </select>
+
+              <button
+                type="submit"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-xs shadow-sm whitespace-nowrap transition transform active:scale-95 flex items-center justify-center space-x-1.5"
+              >
+                <span>🙋‍♂️ Request Member Upgrade</span>
+              </button>
+            </form>
+
+            {membershipReqMsg && (
+              <p className={`text-[11px] font-bold p-2 rounded-xl text-center ${membershipReqMsg.startsWith('Error') ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                {membershipReqMsg}
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -1091,6 +1168,66 @@ export default function HomePage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* MEMBERSHIP UPGRADE REQUESTS SECTION FOR SUPER ADMIN & TREASURER */}
+          {(isSuperAdmin || isTreasurer) && (
+            <div className="pt-4 border-t border-amber-100 space-y-3">
+              <div className="flex items-center space-x-2">
+                <UserCheck className="w-4 h-4 text-purple-600" />
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                  Pending Membership Upgrade Requests ({membershipRequests.filter(r => r.status === 'PENDING').length})
+                </h4>
+              </div>
+
+              {membershipRequests.filter(r => r.status === 'PENDING').length === 0 ? (
+                <p className="text-slate-500 text-xs py-3 text-center font-medium bg-amber-50/40 rounded-2xl border border-amber-200/60">
+                  No pending membership requests waiting approval.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {membershipRequests.filter(r => r.status === 'PENDING').map((req) => (
+                    <div key={req.id} className="bg-purple-50/60 border border-purple-200/80 rounded-2xl p-4 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+                            <span>{req.userName}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold border border-purple-200">
+                              Requested {req.requestedRole}
+                            </span>
+                          </p>
+                          <p className="text-xs text-slate-600 font-medium">Email: <span className="text-slate-900 font-bold">{req.userEmail}</span></p>
+                          <p className="text-xs text-slate-600 font-medium">Area / Wing: <span className="text-orange-700 font-bold">{req.userArea}</span></p>
+                          <p className="text-[10px] text-slate-400 font-mono mt-0.5">{new Date(req.createdAt).toLocaleString()}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => handleDecideMembershipRequest(req.id, 'APPROVE', 'MEMBER')}
+                          className="flex-1 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs shadow-xs flex items-center justify-center space-x-1"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Approve Member</span>
+                        </button>
+                        <button
+                          onClick={() => handleDecideMembershipRequest(req.id, 'APPROVE', 'COLLECTOR')}
+                          className="flex-1 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-xs"
+                        >
+                          Approve Collector
+                        </button>
+                        <button
+                          onClick={() => handleDecideMembershipRequest(req.id, 'REJECT')}
+                          className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 font-bold text-xs border border-slate-200"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1763,15 +1900,36 @@ export default function HomePage() {
             </h3>
             <form onSubmit={handleAddContribution} className="space-y-2.5 text-xs">
               <div>
-                <label className="block text-slate-400 mb-1">Member Name</label>
+                <label className="block text-slate-400 mb-1 flex justify-between">
+                  <span>Member Name</span>
+                  <span className="text-[10px] text-amber-400 font-medium">⚡ Auto-indexed from DB</span>
+                </label>
                 <input 
                   type="text" 
-                  placeholder="e.g. Rahul Sharma"
-                  className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-orange-500"
+                  list="approved-database-members"
+                  placeholder="Type or pick approved member..."
+                  className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-orange-500 font-bold"
                   value={contribForm.memberName}
-                  onChange={(e) => setContribForm({ ...contribForm, memberName: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const matchedUser = registeredUsers.find(u => u.name.toLowerCase() === val.toLowerCase() || u.email.toLowerCase() === val.toLowerCase());
+                    if (matchedUser) {
+                      setContribForm({ 
+                        ...contribForm, 
+                        memberName: matchedUser.name, 
+                        memberArea: matchedUser.area || contribForm.memberArea 
+                      });
+                    } else {
+                      setContribForm({ ...contribForm, memberName: val });
+                    }
+                  }}
                   required
                 />
+                <datalist id="approved-database-members">
+                  {registeredUsers.map((u) => (
+                    <option key={u.id} value={u.name}>{u.name} ({u.area || 'General Area'}) - {u.email}</option>
+                  ))}
+                </datalist>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>

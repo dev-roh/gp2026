@@ -54,10 +54,22 @@ export interface NotificationItem {
   recipientEmail: string;
   title: string;
   message: string;
-  type: 'CONTRIBUTION_APPROVAL_REQUIRED' | 'CONTRIBUTION_APPROVED' | 'HANDOVER_APPROVAL_REQUIRED';
+  type: 'CONTRIBUTION_APPROVAL_REQUIRED' | 'CONTRIBUTION_APPROVED' | 'HANDOVER_APPROVAL_REQUIRED' | 'MEMBERSHIP_REQUEST' | 'MEMBERSHIP_APPROVED';
   targetId: string;
   isRead: boolean;
   date: string;
+}
+
+export interface MembershipRequest {
+  id: string;
+  userName: string;
+  userEmail: string;
+  userArea?: string;
+  requestedRole: 'MEMBER' | 'COLLECTOR';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
+  decidedBy?: string;
+  decidedAt?: string;
 }
 
 export interface Handover {
@@ -111,6 +123,7 @@ export interface DatabaseSchema {
   handovers: Handover[];
   expenses: Expense[];
   programmes: ProgrammeItem[];
+  membershipRequests: MembershipRequest[];
 }
 
 const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
@@ -143,7 +156,8 @@ const initialData: DatabaseSchema = {
   notifications: [],
   handovers: [],
   expenses: [],
-  programmes: []
+  programmes: [],
+  membershipRequests: []
 };
 
 export function getDb(): DatabaseSchema {
@@ -164,6 +178,7 @@ export function getDb(): DatabaseSchema {
     if (!parsed.roleAssignments) parsed.roleAssignments = initialData.roleAssignments;
     if (!parsed.notifications) parsed.notifications = [];
     if (!parsed.programmes) parsed.programmes = [];
+    if (!parsed.membershipRequests) parsed.membershipRequests = [];
     return parsed;
   } catch (err) {
     console.error('getDb filesystem error:', err);
