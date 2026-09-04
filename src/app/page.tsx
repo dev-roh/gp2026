@@ -15,7 +15,8 @@ import {
   ShieldCheck,
   Palette,
   Image as ImageIcon,
-  Sliders
+  Sliders,
+  CheckCircle2
 } from 'lucide-react';
 import { AppSettings } from '@/lib/db';
 
@@ -31,6 +32,7 @@ interface FinanceSummary {
 interface CollectorBalance {
   collectorId: string;
   collectorName: string;
+  collectorArea: string;
   cashInHand: number;
   pendingHandoverAmount: number;
 }
@@ -44,7 +46,7 @@ interface Contribution {
   date: string;
   memberId: string;
   memberName: string;
-  memberFlat: string;
+  memberArea: string;
   collectorId: string;
   collectorName: string;
 }
@@ -57,6 +59,9 @@ interface Handover {
   date: string;
   collectorId: string;
   collectorName: string;
+  collectorArea?: string;
+  treasurerId?: string;
+  treasurerName?: string;
 }
 
 interface Expense {
@@ -109,16 +114,17 @@ export default function HomePage() {
   const [selectedRole, setSelectedRole] = useState<'SUPER_ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER' | 'VIEW_ONLY'>('COLLECTOR');
   const [roleMsg, setRoleMsg] = useState('');
 
-  // Modals & Selected Receipt
+  // Modals & Selected Receipt / Handover Voucher
   const [showAddContribution, setShowAddContribution] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showAddHandover, setShowAddHandover] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Contribution | null>(null);
+  const [selectedHandover, setSelectedHandover] = useState<Handover | null>(null);
 
   // Form states
   const [contribForm, setContribForm] = useState({
     memberName: '',
-    memberFlat: '',
+    memberArea: '',
     amount: '',
     paymentMode: 'CASH' as 'CASH' | 'UPI' | 'BANK_TRANSFER',
     note: ''
@@ -133,6 +139,7 @@ export default function HomePage() {
 
   const [handoverForm, setHandoverForm] = useState({
     amount: '',
+    collectorArea: 'Sector 1 / Wing A',
     notes: ''
   });
 
@@ -242,7 +249,7 @@ export default function HomePage() {
         type: 'ADD_CONTRIBUTION',
         data: {
           memberName: contribForm.memberName,
-          memberFlat: contribForm.memberFlat || 'N/A',
+          memberArea: contribForm.memberArea || 'General Area',
           amount: parseFloat(contribForm.amount),
           paymentMode: contribForm.paymentMode,
           collectorId: session?.user?.email || 'usr-2',
@@ -255,7 +262,7 @@ export default function HomePage() {
     const result = await res.json();
     if (res.ok) {
       setShowAddContribution(false);
-      setContribForm({ memberName: '', memberFlat: '', amount: '', paymentMode: 'CASH', note: '' });
+      setContribForm({ memberName: '', memberArea: '', amount: '', paymentMode: 'CASH', note: '' });
       fetchFinanceData();
       if (result?.item) {
         setSelectedReceipt(result.item);
@@ -307,6 +314,7 @@ export default function HomePage() {
         data: {
           collectorId: session?.user?.email || 'usr-2',
           collectorName: session?.user?.name || 'Collector',
+          collectorArea: handoverForm.collectorArea || 'General Area',
           amount: parseFloat(handoverForm.amount),
           notes: handoverForm.notes
         }
@@ -316,8 +324,11 @@ export default function HomePage() {
     const result = await res.json();
     if (res.ok) {
       setShowAddHandover(false);
-      setHandoverForm({ amount: '', notes: '' });
+      setHandoverForm({ amount: '', collectorArea: 'Sector 1 / Wing A', notes: '' });
       fetchFinanceData();
+      if (result?.item) {
+        setSelectedHandover(result.item);
+      }
     } else {
       alert(result.error || 'Operation failed');
     }
@@ -354,12 +365,25 @@ export default function HomePage() {
   const generateWhatsAppShare = (c: Contribution) => {
     const text = `*${settings.appTitle} Payment Receipt* 🐘\n\n` +
       `Receipt No: *${c.receiptNo}*\n` +
-      `Received From: *${c.memberName} (${c.memberFlat})*\n` +
+      `Received From: *${c.memberName} (Area: ${c.memberArea})*\n` +
       `Amount Received: *₹${c.amount.toLocaleString()}*\n` +
       `Payment Mode: *${c.paymentMode}*\n` +
       `Collector: *${c.collectorName}*\n` +
       `Date: *${new Date(c.date).toLocaleDateString()}*\n\n` +
       `Thank you for your generous contribution!\n` +
+      `View portal: https://gp2026.luhurachati.com`;
+    
+    return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+  };
+
+  const generateHandoverWhatsAppShare = (h: Handover) => {
+    const text = `*${settings.appTitle} - Cash Handover Voucher* 💸\n\n` +
+      `Voucher ID: *${h.id}*\n` +
+      `Collector: *${h.collectorName} (Area: ${h.collectorArea || 'General Area'})*\n` +
+      `Handover Amount: *₹${h.amount.toLocaleString()}*\n` +
+      `Status: *${h.status}*\n` +
+      `Approved By: *${h.treasurerName || 'Treasurer'}*\n` +
+      `Date: *${new Date(h.date).toLocaleDateString()}*\n\n` +
       `View portal: https://gp2026.luhurachati.com`;
     
     return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
@@ -621,7 +645,7 @@ export default function HomePage() {
               {contributions.slice(0, 5).map((c) => (
                 <div key={c.id} className="py-2 flex items-center justify-between text-xs">
                   <div>
-                    <p className="font-semibold text-slate-200">{c.memberName} <span className="text-slate-400 font-normal">({c.memberFlat})</span></p>
+                    <p className="font-semibold text-slate-200">{c.memberName} <span className="text-slate-400 font-normal">({c.memberArea})</span></p>
                     <p className="text-[10px] text-slate-400">Collected by: {c.collectorName}</p>
                   </div>
                   <div className="text-right flex items-center space-x-2">
@@ -664,6 +688,7 @@ export default function HomePage() {
                 <div key={col.collectorId} className="py-2.5 flex items-center justify-between text-xs">
                   <div>
                     <p className="font-semibold text-slate-200">{col.collectorName}</p>
+                    <p className="text-[10px] text-slate-400">Area: {col.collectorArea}</p>
                     <p className="text-[10px] text-amber-400">Pending Handover: ₹{col.pendingHandoverAmount.toLocaleString()}</p>
                   </div>
                   <div className="text-right">
@@ -676,7 +701,7 @@ export default function HomePage() {
           </div>
 
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-md space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Handover Approval Requests</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Handover Approval Requests & Vouchers</h3>
             {handovers.length === 0 ? (
               <p className="text-xs text-slate-500 py-2">No handover requests logged.</p>
             ) : (
@@ -685,21 +710,31 @@ export default function HomePage() {
                   <div key={h.id} className="bg-slate-850 p-2.5 rounded-lg border border-slate-800 text-xs flex items-center justify-between">
                     <div>
                       <p className="font-semibold text-slate-200">{h.collectorName}</p>
+                      <p className="text-[10px] text-slate-400">Area: {h.collectorArea || 'General Area'}</p>
                       <p className="text-[10px] text-slate-400">Notes: {h.notes || 'N/A'}</p>
                       <span className={`inline-block text-[9px] px-1.5 py-0.5 mt-1 rounded font-medium ${h.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
                         {h.status}
                       </span>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-amber-400 mb-1.5">₹{h.amount.toLocaleString()}</p>
-                      {h.status === 'PENDING' && isTreasurer && (
-                        <button 
-                          onClick={() => handleApproveHandover(h.id)}
-                          className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold shadow"
-                        >
-                          Approve
-                        </button>
-                      )}
+                    <div className="text-right flex items-center space-x-2">
+                      <div>
+                        <p className="font-bold text-amber-400 mb-1">₹{h.amount.toLocaleString()}</p>
+                        {h.status === 'PENDING' && isTreasurer && (
+                          <button 
+                            onClick={() => handleApproveHandover(h.id)}
+                            className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold shadow"
+                          >
+                            Approve
+                          </button>
+                        )}
+                      </div>
+                      <button 
+                        onClick={() => setSelectedHandover(h)}
+                        className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20"
+                        title="View Handover Voucher"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -729,7 +764,7 @@ export default function HomePage() {
                 <div>
                   <div className="flex items-center space-x-1.5">
                     <span className="font-bold text-slate-200">{c.memberName}</span>
-                    <span className="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">{c.memberFlat}</span>
+                    <span className="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">{c.memberArea}</span>
                   </div>
                   <p className="text-[10px] text-slate-400 mt-0.5">Receipt: <span className="text-slate-300 font-mono">{c.receiptNo}</span></p>
                   <p className="text-[10px] text-slate-500">Collected by {c.collectorName}</p>
@@ -851,7 +886,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* TAB CONTENT: Super Admin Branding & Labels Console */}
+      {/* TAB CONTENT: Super Admin Branding Console */}
       {activeTab === 'branding' && isSuperAdmin && (
         <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-3 shadow-md space-y-4 text-xs">
           <div className="flex items-center space-x-2">
@@ -863,7 +898,6 @@ export default function HomePage() {
           </div>
 
           <form onSubmit={handleUpdateSettings} className="space-y-3 bg-slate-850 p-3 rounded-xl border border-slate-800">
-            {/* Logo Image Upload */}
             <div>
               <label className="block text-slate-400 mb-1 font-semibold flex items-center gap-1">
                 <ImageIcon className="w-3.5 h-3.5 text-amber-400" /> App Logo Image
@@ -881,7 +915,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Color Theme Selector */}
             <div>
               <label className="block text-slate-400 mb-1 font-semibold flex items-center gap-1">
                 <Palette className="w-3.5 h-3.5 text-amber-400" /> Visual Color Theme
@@ -898,7 +931,6 @@ export default function HomePage() {
               </select>
             </div>
 
-            {/* Application Titles */}
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-slate-400 mb-1">App Title</label>
@@ -922,7 +954,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Custom Button & Progress Labels */}
             <div className="space-y-2 pt-1 border-t border-slate-800">
               <p className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">Custom UI Button Labels</p>
               <div>
@@ -958,6 +989,66 @@ export default function HomePage() {
         </div>
       )}
 
+      {/* HANDOVER CASH VOUCHER MODAL */}
+      {selectedHandover && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-cyan-500/30 w-full max-w-xs rounded-2xl p-5 shadow-2xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 mx-auto flex items-center justify-center font-bold text-xl text-slate-950 shadow-lg">
+              💸
+            </div>
+            
+            <div>
+              <h3 className="text-base font-bold text-slate-100">{settings.appTitle}</h3>
+              <p className="text-xs text-cyan-400 font-medium">Cash Handover Voucher</p>
+              <p className="text-[10px] text-slate-500 font-mono mt-0.5">{selectedHandover.id}</p>
+            </div>
+
+            <div className="bg-slate-850 border border-slate-800 rounded-xl p-3 text-xs text-left space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Collector:</span>
+                <span className="font-bold text-slate-200">{selectedHandover.collectorName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Area / Wing:</span>
+                <span className="font-semibold text-slate-200">{selectedHandover.collectorArea || 'General Area'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Amount Transferred:</span>
+                <span className="font-extrabold text-amber-400 text-sm">₹{selectedHandover.amount.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Status:</span>
+                <span className={`font-bold ${selectedHandover.status === 'APPROVED' ? 'text-emerald-400' : 'text-amber-400'}`}>{selectedHandover.status}</span>
+              </div>
+              {selectedHandover.treasurerName && (
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Approved By:</span>
+                  <span className="font-medium text-slate-300">{selectedHandover.treasurerName}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <a 
+                href={generateHandoverWhatsAppShare(selectedHandover)}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center space-x-1.5 shadow-lg"
+              >
+                <Share2 className="w-4 h-4" />
+                <span>Share Voucher via WhatsApp</span>
+              </a>
+              <button 
+                onClick={() => setSelectedHandover(null)} 
+                className="w-full py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* DIGITAL RECEIPT MODAL */}
       {selectedReceipt && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -982,8 +1073,8 @@ export default function HomePage() {
                 <span className="font-bold text-slate-200">{selectedReceipt.memberName}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Flat No:</span>
-                <span className="font-semibold text-slate-200">{selectedReceipt.memberFlat}</span>
+                <span className="text-slate-400">Area / Wing:</span>
+                <span className="font-semibold text-slate-200">{selectedReceipt.memberArea}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Amount Paid:</span>
@@ -1042,13 +1133,13 @@ export default function HomePage() {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-slate-400 mb-1">Flat No.</label>
+                  <label className="block text-slate-400 mb-1">Area / Wing</label>
                   <input 
                     type="text" 
-                    placeholder="e.g. A-302"
+                    placeholder="e.g. Sector 2 / Wing A"
                     className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-orange-500"
-                    value={contribForm.memberFlat}
-                    onChange={(e) => setContribForm({ ...contribForm, memberFlat: e.target.value })}
+                    value={contribForm.memberArea}
+                    onChange={(e) => setContribForm({ ...contribForm, memberArea: e.target.value })}
                   />
                 </div>
                 <div>
@@ -1173,10 +1264,20 @@ export default function HomePage() {
                 />
               </div>
               <div>
+                <label className="block text-slate-400 mb-1">Collector Area / Wing</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Sector 1 / Wing A"
+                  className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-cyan-500"
+                  value={handoverForm.collectorArea}
+                  onChange={(e) => setHandoverForm({ ...handoverForm, collectorArea: e.target.value })}
+                />
+              </div>
+              <div>
                 <label className="block text-slate-400 mb-1">Notes / Description</label>
                 <input 
                   type="text" 
-                  placeholder="e.g. Collected cash from Wing A"
+                  placeholder="e.g. Cash collected from Sector 1"
                   className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-cyan-500"
                   value={handoverForm.notes}
                   onChange={(e) => setHandoverForm({ ...handoverForm, notes: e.target.value })}

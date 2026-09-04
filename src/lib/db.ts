@@ -19,7 +19,7 @@ export interface User {
   email: string;
   image?: string;
   role: 'SUPER_ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER' | 'VIEW_ONLY';
-  flatNo?: string;
+  area?: string;
   phone?: string;
   createdAt: string;
 }
@@ -40,7 +40,7 @@ export interface Contribution {
   date: string;
   memberId: string;
   memberName: string;
-  memberFlat: string;
+  memberArea: string;
   collectorId: string;
   collectorName: string;
 }
@@ -53,7 +53,9 @@ export interface Handover {
   date: string;
   collectorId: string;
   collectorName: string;
+  collectorArea?: string;
   treasurerId?: string;
+  treasurerName?: string;
 }
 
 export interface Expense {
@@ -97,9 +99,9 @@ const defaultSettings: AppSettings = {
 const initialData: DatabaseSchema = {
   settings: defaultSettings,
   users: [
-    { id: 'usr-0', name: 'Super Admin', email: SUPER_ADMIN_EMAIL, role: 'SUPER_ADMIN', flatNo: 'Admin', phone: '+919999999999', createdAt: new Date().toISOString() },
-    { id: 'usr-1', name: 'Rajesh Sharma (Treasurer)', email: 'treasurer@gp2026.com', role: 'TREASURER', flatNo: 'A-401', phone: '+919876543210', createdAt: new Date().toISOString() },
-    { id: 'usr-2', name: 'Amit Patel (Collector)', email: 'collector1@gp2026.com', role: 'COLLECTOR', flatNo: 'B-102', phone: '+919876543211', createdAt: new Date().toISOString() },
+    { id: 'usr-0', name: 'Super Admin', email: SUPER_ADMIN_EMAIL, role: 'SUPER_ADMIN', area: 'Admin Central', phone: '+919999999999', createdAt: new Date().toISOString() },
+    { id: 'usr-1', name: 'Rajesh Sharma (Treasurer)', email: 'treasurer@gp2026.com', role: 'TREASURER', area: 'Wing A', phone: '+919876543210', createdAt: new Date().toISOString() },
+    { id: 'usr-2', name: 'Amit Patel (Collector)', email: 'collector1@gp2026.com', role: 'COLLECTOR', area: 'Wing B', phone: '+919876543211', createdAt: new Date().toISOString() },
   ],
   roleAssignments: {
     [SUPER_ADMIN_EMAIL]: { email: SUPER_ADMIN_EMAIL, role: 'SUPER_ADMIN', assignedBy: 'SYSTEM', updatedAt: new Date().toISOString() },
@@ -107,11 +109,11 @@ const initialData: DatabaseSchema = {
     'collector1@gp2026.com': { email: 'collector1@gp2026.com', role: 'COLLECTOR', assignedBy: SUPER_ADMIN_EMAIL, updatedAt: new Date().toISOString() }
   },
   contributions: [
-    { id: 'cnt-1', amount: 5000, paymentMode: 'CASH', receiptNo: 'REC-2026-001', note: 'Full annual chanda', date: new Date().toISOString(), memberId: 'usr-4', memberName: 'Priya Joshi', memberFlat: 'A-101', collectorId: 'usr-2', collectorName: 'Amit Patel' },
-    { id: 'cnt-2', amount: 3500, paymentMode: 'UPI', receiptNo: 'REC-2026-002', note: 'Partial payment', date: new Date().toISOString(), memberId: 'usr-5', memberName: 'Vikram Singh', memberFlat: 'B-205', collectorId: 'usr-1', collectorName: 'Rajesh Sharma' }
+    { id: 'cnt-1', amount: 5000, paymentMode: 'CASH', receiptNo: 'REC-2026-001', note: 'Full annual chanda', date: new Date().toISOString(), memberId: 'usr-4', memberName: 'Priya Joshi', memberArea: 'Sector 1 / Wing A', collectorId: 'usr-2', collectorName: 'Amit Patel' },
+    { id: 'cnt-2', amount: 3500, paymentMode: 'UPI', receiptNo: 'REC-2026-002', note: 'Partial payment', date: new Date().toISOString(), memberId: 'usr-5', memberName: 'Vikram Singh', memberArea: 'Sector 2 / Wing B', collectorId: 'usr-1', collectorName: 'Rajesh Sharma' }
   ],
   handovers: [
-    { id: 'hnd-1', amount: 5000, status: 'PENDING', notes: 'Cash collected from Wing A on Sept 3', date: new Date().toISOString(), collectorId: 'usr-2', collectorName: 'Amit Patel' }
+    { id: 'hnd-1', amount: 5000, status: 'PENDING', notes: 'Cash collected from Sector 1 / Wing A', date: new Date().toISOString(), collectorId: 'usr-2', collectorName: 'Amit Patel', collectorArea: 'Sector 1 / Wing A' }
   ],
   expenses: [
     { id: 'exp-1', title: 'Pandal Advance Payment', category: 'Decoration', amount: 12000, isOutofPocket: false, isReimbursed: false, date: new Date().toISOString(), paidById: 'usr-1', paidByName: 'Rajesh Sharma' },

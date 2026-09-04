@@ -9,10 +9,10 @@ export async function GET(req: Request) {
   const db = getDb();
 
   if (format === 'csv') {
-    let csv = 'Type,ID,Date,Name/Title,Flat/Category,Amount,PaymentMode/OutofPocket,Collector/PaidBy,Notes/Status\n';
+    let csv = 'Type,ID,Date,Name/Title,Area/Category,Amount,PaymentMode/OutofPocket,Collector/PaidBy,Notes/Status\n';
     
     db.contributions.forEach(c => {
-      csv += `Contribution,"${c.id}","${c.date}","${c.memberName}","${c.memberFlat}",${c.amount},"${c.paymentMode}","${c.collectorName}","Receipt: ${c.receiptNo}"\n`;
+      csv += `Contribution,"${c.id}","${c.date}","${c.memberName}","${c.memberArea}",${c.amount},"${c.paymentMode}","${c.collectorName}","Receipt: ${c.receiptNo}"\n`;
     });
 
     db.expenses.forEach(e => {
@@ -62,6 +62,7 @@ export async function GET(req: Request) {
       return {
         collectorId: collector.id,
         collectorName: collector.name,
+        collectorArea: collector.area || 'General',
         cashInHand,
         pendingHandoverAmount: totalPendingHandovers
       };
@@ -80,7 +81,7 @@ export async function GET(req: Request) {
     collectorBalances,
     latestContributions: db.contributions.slice().reverse(),
     latestExpenses: db.expenses.slice().reverse(),
-    handovers: db.handovers
+    handovers: db.handovers.slice().reverse()
   });
 }
 
@@ -147,8 +148,9 @@ export async function POST(req: Request) {
       if (index !== -1) {
         db.handovers[index].status = 'APPROVED';
         db.handovers[index].treasurerId = data.treasurerId || 'usr-1';
+        db.handovers[index].treasurerName = session?.user?.name || 'Treasurer';
         saveDb(db);
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true, item: db.handovers[index] });
       }
     }
 
