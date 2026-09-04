@@ -1,6 +1,6 @@
 import NextAuth, { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
-import { getUserRole, registerOrUpdateUser } from '@/lib/db';
+import { getUserRole, registerOrUpdateUserAsync } from '@/lib/db';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -12,7 +12,7 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user }) {
       if (user?.email && user?.name) {
-        registerOrUpdateUser(user.name, user.email, user.image || undefined);
+        await registerOrUpdateUserAsync(user.name, user.email, user.image || undefined);
       }
       return true;
     },

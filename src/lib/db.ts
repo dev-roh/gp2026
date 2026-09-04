@@ -191,6 +191,13 @@ export async function getDbAsync(): Promise<DatabaseSchema> {
         global._cachedDb = data.data as DatabaseSchema;
         return global._cachedDb;
       }
+
+      // If table missing or row missing, seed database to Supabase
+      if (error && (error.code === 'PGRST116' || error.code === 'PGRST205' || error.message?.includes('schema cache'))) {
+        const localData = getDb();
+        await saveDbAsync(localData);
+        return localData;
+      }
     } catch (err) {
       console.error('Supabase fetch error:', err);
     }
@@ -205,9 +212,13 @@ export async function saveDbAsync(data: DatabaseSchema): Promise<void> {
 
   if (supabase) {
     try {
-      await supabase
+      const { error } = await supabase
         .from('app_db')
         .upsert({ id: dbRecordId, data, updated_at: new Date().toISOString() });
+      
+      if (error) {
+        console.error('Supabase save error details:', error.message, error.code, error.details);
+      }
     } catch (err) {
       console.error('Supabase save error:', err);
     }
@@ -317,6 +328,51 @@ export function getUserRole(email: string | null | undefined): 'SUPER_ADMIN' | '
   return 'VIEW_ONLY';
 }
 
+export async function registerOrUpdateUserAsync(name: string, email: string, image?: string): Promise<User> {
+  const db = await getDbAsync();
+  const normalizedEmail = email.toLowerCase();
+  let user = db.users.find(u => u.email.toLowerCase() === normalizedEmail);
+
+  if (!user) {
+    const role = getUserRole(normalizedEmail);
+    user = {
+      id: `usr-${Date.now()}`,
+      name,
+      email: normalizedEmail,
+      image,
+      role,
+      area: 'General Area',
+      createdAt: new Date().toISOString()
+    };
+    db.users.push(user);
+
+    // Auto-link any historical contributions where memberName matches exact registered name
+    db.contributions.forEach(c => {
+      if (c.memberName && c.memberName.trim().toLowerCase() === name.trim().toLowerCase()) {
+        c.memberId = user!.id;
+      }
+    });
+
+    await saveDbAsync(db);
+  } else {
+    let updated = false;
+    if (name && user.name !== name) { user.name = name; updated = true; }
+    if (image && user.image !== image) { user.image = image; updated = true; }
+    
+    // Check if there are any unlinked contributions matching memberName
+    db.contributions.forEach(c => {
+      if (c.memberName && c.memberName.trim().toLowerCase() === name.trim().toLowerCase() && c.memberId !== user!.id) {
+        c.memberId = user!.id;
+        updated = true;
+      }
+    });
+
+    if (updated) await saveDbAsync(db);
+  }
+
+  return user;
+}
+
 export function registerOrUpdateUser(name: string, email: string, image?: string): User {
   const db = getDb();
   const normalizedEmail = email.toLowerCase();
@@ -336,11 +392,9 @@ export function registerOrUpdateUser(name: string, email: string, image?: string
     db.users.push(user);
 
     // Auto-link any historical contributions where memberName matches exact registered name
-    let updatedContributions = false;
     db.contributions.forEach(c => {
       if (c.memberName && c.memberName.trim().toLowerCase() === name.trim().toLowerCase()) {
         c.memberId = user!.id;
-        updatedContributions = true;
       }
     });
 
