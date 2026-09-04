@@ -10,8 +10,9 @@ export async function middleware(req: NextRequest) {
 
   const { pathname } = req.nextUrl;
 
-  // Allow NextAuth API calls, static assets, and manifest files
+  // Allow public landing page, NextAuth callbacks, static assets, and manifest files
   if (
+    pathname === '/' ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/_next') ||
     pathname.includes('/favicon.ico') ||
@@ -21,15 +22,9 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // If user is NOT authenticated, redirect to sign-in screen
-  if (!token) {
-    const loginUrl = new URL('/', req.url);
-    loginUrl.searchParams.set('callbackUrl', req.url);
-    
-    // Serve sign-in prompt on root page or api block
-    if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'Unauthorized. Please sign in.' }, { status: 401 });
-    }
+  // If user is NOT authenticated trying to access protected API, return 401
+  if (!token && pathname.startsWith('/api/')) {
+    return NextResponse.json({ error: 'Unauthorized. Please sign in.' }, { status: 401 });
   }
 
   return NextResponse.next();

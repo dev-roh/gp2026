@@ -28,8 +28,5 @@ export const authOptions: NextAuthOptions = {
       return baseUrl;
     },
   },
-  pages: {
-    signIn: '/',
-  },
   secret: process.env.NEXTAUTH_SECRET || 'ganesh_puja_2026_super_secret_local_key',
 };
