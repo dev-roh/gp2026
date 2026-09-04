@@ -111,6 +111,7 @@ export interface ProgrammeItem {
   photoUrl?: string;
   mediaType?: 'IMAGE' | 'YOUTUBE' | 'INSTAGRAM';
   embedUrl?: string;
+  videoOrientation?: 'LANDSCAPE' | 'PORTRAIT';
   createdAt: string;
 }
 

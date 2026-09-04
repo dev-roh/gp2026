@@ -22,7 +22,8 @@ import {
   Users,
   Calendar,
   Video,
-  Camera
+  Camera,
+  Play
 } from 'lucide-react';
 import { AppSettings, User as DbUser, ProgrammeItem } from '@/lib/db';
 
@@ -106,6 +107,141 @@ interface RoleAssignment {
   updatedAt: string;
 }
 
+function ProgrammeMediaCard({ prog }: { prog: ProgrammeItem }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Auto-detect orientation: portrait if URL contains shorts/reel/tiktok or explicitly marked PORTRAIT
+  const isPortrait = 
+    prog.videoOrientation === 'PORTRAIT' || 
+    (prog.embedUrl && (
+      prog.embedUrl.toLowerCase().includes('/shorts/') || 
+      prog.embedUrl.toLowerCase().includes('/reel/') ||
+      prog.embedUrl.toLowerCase().includes('instagram.com/p/')
+    ));
+
+  // Extract YouTube ID if applicable
+  const getYouTubeEmbedUrl = (url: string) => {
+    let videoId = '';
+    if (url.includes('youtu.be/')) {
+      videoId = url.split('youtu.be/')[1]?.split('?')[0];
+    } else if (url.includes('youtube.com/watch?v=')) {
+      videoId = url.split('watch?v=')[1]?.split('&')[0];
+    } else if (url.includes('youtube.com/shorts/')) {
+      videoId = url.split('/shorts/')[1]?.split('?')[0];
+    }
+    return videoId ? `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0` : url;
+  };
+
+  const getYouTubeThumbnail = (url: string) => {
+    let videoId = '';
+    if (url.includes('youtu.be/')) {
+      videoId = url.split('youtu.be/')[1]?.split('?')[0];
+    } else if (url.includes('youtube.com/watch?v=')) {
+      videoId = url.split('watch?v=')[1]?.split('&')[0];
+    } else if (url.includes('youtube.com/shorts/')) {
+      videoId = url.split('/shorts/')[1]?.split('?')[0];
+    }
+    return videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null;
+  };
+
+  if (prog.mediaType === 'IMAGE' && prog.photoUrl) {
+    return (
+      <div className="rounded-2xl overflow-hidden border border-amber-200/80 bg-slate-50 mt-2 shadow-xs">
+        <img 
+          src={prog.photoUrl} 
+          alt={prog.title} 
+          className="w-full h-auto max-h-96 object-contain mx-auto" 
+        />
+      </div>
+    );
+  }
+
+  if (prog.mediaType === 'YOUTUBE' && prog.embedUrl) {
+    const embedSrc = getYouTubeEmbedUrl(prog.embedUrl);
+    const thumbnail = getYouTubeThumbnail(prog.embedUrl);
+
+    return (
+      <div className={`mt-3 rounded-2xl overflow-hidden border border-amber-200/80 bg-slate-950 shadow-md ${isPortrait ? 'max-w-xs mx-auto aspect-[9/16] w-full' : 'w-full aspect-video'}`}>
+        {!isPlaying ? (
+          <div className="relative w-full h-full group cursor-pointer flex items-center justify-center bg-slate-900 overflow-hidden" onClick={() => setIsPlaying(true)}>
+            {thumbnail ? (
+              <img src={thumbnail} alt={prog.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-300 opacity-80" />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-tr from-amber-900 via-orange-950 to-slate-950"></div>
+            )}
+
+            {/* Play Button Overlay */}
+            <div className="absolute inset-0 bg-slate-950/40 flex flex-col items-center justify-center gap-2 group-hover:bg-slate-950/25 transition">
+              <button 
+                type="button" 
+                className="w-14 h-14 rounded-full bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 text-white flex items-center justify-center shadow-xl group-hover:scale-110 transition transform active:scale-95 border-2 border-white/90"
+              >
+                <Play className="w-6 h-6 text-white ml-1 fill-current" />
+              </button>
+              <span className="text-[10px] font-extrabold text-white bg-slate-900/90 px-3 py-1 rounded-full border border-white/20 backdrop-blur-xs shadow-xs">
+                ▶ Click to Play ({isPortrait ? '9:16 Portrait Reel' : '16:9 HD Video'})
+              </span>
+            </div>
+          </div>
+        ) : (
+          <iframe
+            src={embedSrc}
+            title={prog.title}
+            className="w-full h-full border-0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          ></iframe>
+        )}
+      </div>
+    );
+  }
+
+  if (prog.mediaType === 'INSTAGRAM' && prog.embedUrl) {
+    return (
+      <div className={`mt-3 rounded-2xl border border-pink-200/80 bg-gradient-to-br from-pink-50 via-rose-50 to-amber-50 p-4 text-center shadow-xs ${isPortrait ? 'max-w-xs mx-auto' : 'w-full'}`}>
+        {!isPlaying ? (
+          <div className="space-y-3 py-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-500 text-white flex items-center justify-center mx-auto shadow-md">
+              <Video className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="font-extrabold text-slate-900 text-xs">{prog.title}</p>
+              <p className="text-[10px] text-pink-700 font-bold uppercase tracking-wider mt-0.5">
+                Official Instagram {isPortrait ? 'Reel (9:16 Portrait)' : 'Post'}
+              </p>
+            </div>
+            <button
+              onClick={() => setIsPlaying(true)}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white text-xs font-extrabold shadow-sm inline-flex items-center space-x-1.5 transition transform active:scale-95"
+            >
+              <Play className="w-4 h-4 fill-current" />
+              <span>▶ Click to Load Media</span>
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <iframe
+              src={`${prog.embedUrl.replace(/\/$/, '')}/embed`}
+              className={`w-full border-0 rounded-xl bg-white shadow-xs ${isPortrait ? 'h-[420px]' : 'h-64'}`}
+              allowTransparency
+            ></iframe>
+            <a
+              href={prog.embedUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[10px] text-pink-700 hover:underline font-bold block pt-1"
+            >
+              Open in Instagram App &rarr;
+            </a>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return null;
+}
+
 export default function HomePage() {
   const { data: session, status } = useSession();
   const [activeTab, setActiveTab] = useState<'overview' | 'programmes' | 'collectors' | 'contributions' | 'expenses' | 'reimbursements' | 'approvals' | 'admin' | 'branding'>('overview');
@@ -127,7 +263,8 @@ export default function HomePage() {
     location: '',
     photoUrl: '',
     mediaType: 'IMAGE' as 'IMAGE' | 'YOUTUBE' | 'INSTAGRAM',
-    embedUrl: ''
+    embedUrl: '',
+    videoOrientation: 'LANDSCAPE' as 'LANDSCAPE' | 'PORTRAIT'
   });
 
   // Collectors and Treasurers List for tagging
@@ -300,7 +437,8 @@ export default function HomePage() {
         location: '',
         photoUrl: '',
         mediaType: 'IMAGE',
-        embedUrl: ''
+        embedUrl: '',
+        videoOrientation: 'LANDSCAPE'
       });
       fetchFinanceData();
     } else {
@@ -1085,38 +1223,8 @@ export default function HomePage() {
 
                     <p className="text-xs text-slate-700 leading-relaxed font-medium">{prog.description}</p>
 
-                    {/* Media Embedding (Photos / Whitelisted YouTube & Instagram) */}
-                    {prog.mediaType === 'IMAGE' && prog.photoUrl && (
-                      <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 mt-2 shadow-xs">
-                        <img src={prog.photoUrl} alt={prog.title} className="w-full max-h-56 object-cover" />
-                      </div>
-                    )}
-
-                    {prog.mediaType === 'YOUTUBE' && prog.embedUrl && (
-                      <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 mt-2 aspect-video shadow-xs">
-                        <iframe
-                          src={prog.embedUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
-                          title={prog.title}
-                          className="w-full h-full"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        ></iframe>
-                      </div>
-                    )}
-
-                    {prog.mediaType === 'INSTAGRAM' && prog.embedUrl && (
-                      <div className="rounded-2xl border border-pink-200 bg-pink-50/50 p-3 text-center mt-2">
-                        <a
-                          href={prog.embedUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center space-x-1.5 text-xs text-pink-700 hover:text-pink-800 font-extrabold"
-                        >
-                          <Video className="w-4 h-4 text-pink-600" />
-                          <span>View Official Post on Instagram →</span>
-                        </a>
-                      </div>
-                    )}
+                    {/* Media Embedding (Photos / Whitelisted YouTube & Instagram with Click-to-Play & Adaptive Framing) */}
+                    <ProgrammeMediaCard prog={prog} />
                   </div>
                 </div>
               ))}
@@ -2183,19 +2291,33 @@ export default function HomePage() {
               )}
 
               {(programmeForm.mediaType === 'YOUTUBE' || programmeForm.mediaType === 'INSTAGRAM') && (
-                <div>
-                  <label className="block text-slate-400 mb-1 font-medium">
-                    Whitelisted {programmeForm.mediaType} Link
-                  </label>
-                  <input
-                    type="url"
-                    placeholder={programmeForm.mediaType === 'YOUTUBE' ? 'https://youtube.com/watch?v=...' : 'https://instagram.com/reel/...'}
-                    className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-cyan-500 font-mono text-[11px]"
-                    value={programmeForm.embedUrl}
-                    onChange={(e) => setProgrammeForm({ ...programmeForm, embedUrl: e.target.value })}
-                  />
-                  <p className="text-[9px] text-slate-500 mt-0.5">Only official youtube.com & instagram.com links allowed.</p>
-                </div>
+                <>
+                  <div>
+                    <label className="block text-slate-400 mb-1 font-medium">
+                      Whitelisted {programmeForm.mediaType} Link
+                    </label>
+                    <input
+                      type="url"
+                      placeholder={programmeForm.mediaType === 'YOUTUBE' ? 'https://youtube.com/watch?v=...' : 'https://instagram.com/reel/...'}
+                      className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-cyan-500 font-mono text-[11px]"
+                      value={programmeForm.embedUrl}
+                      onChange={(e) => setProgrammeForm({ ...programmeForm, embedUrl: e.target.value })}
+                    />
+                    <p className="text-[9px] text-slate-500 mt-0.5">Only official youtube.com & instagram.com links allowed.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 mb-1 font-medium">Video Framing / Orientation</label>
+                    <select
+                      className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-cyan-500 font-bold"
+                      value={programmeForm.videoOrientation}
+                      onChange={(e) => setProgrammeForm({ ...programmeForm, videoOrientation: e.target.value as any })}
+                    >
+                      <option value="LANDSCAPE">Landscape (16:9 Standard HD)</option>
+                      <option value="PORTRAIT">Portrait (9:16 Reel / Shorts)</option>
+                    </select>
+                  </div>
+                </>
               )}
 
               <div className="pt-2 flex gap-2">

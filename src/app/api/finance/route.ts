@@ -291,7 +291,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Forbidden. Only Super Admin can post festival programmes.' }, { status: 403 });
       }
 
-      const { title, description, dateTime, location, photoUrl, mediaType, embedUrl } = data;
+      const { title, description, dateTime, location, photoUrl, mediaType, embedUrl, videoOrientation } = data;
 
       // Security Whitelisting for YouTube & Instagram URL embeds
       if (mediaType === 'YOUTUBE' && embedUrl) {
@@ -317,6 +317,7 @@ export async function POST(req: Request) {
         photoUrl,
         mediaType: mediaType || 'IMAGE',
         embedUrl,
+        videoOrientation: videoOrientation || (embedUrl?.includes('/shorts/') || embedUrl?.includes('/reel/') ? 'PORTRAIT' : 'LANDSCAPE'),
         createdAt: new Date().toISOString()
       };
 
