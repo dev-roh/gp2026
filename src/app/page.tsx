@@ -12,10 +12,12 @@ import {
   Printer, 
   LogOut,
   Lock,
-  UserCheck,
   ShieldCheck,
-  Users
+  Palette,
+  Image as ImageIcon,
+  Sliders
 } from 'lucide-react';
+import { AppSettings } from '@/lib/db';
 
 interface FinanceSummary {
   totalCollected: number;
@@ -78,13 +80,28 @@ interface RoleAssignment {
 
 export default function HomePage() {
   const { data: session, status } = useSession();
-  const [activeTab, setActiveTab] = useState<'overview' | 'collectors' | 'contributions' | 'expenses' | 'admin'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'collectors' | 'contributions' | 'expenses' | 'admin' | 'branding'>('overview');
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [collectorBalances, setCollectorBalances] = useState<CollectorBalance[]>([]);
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [handovers, setHandovers] = useState<Handover[]>([]);
+
+  // Settings & Branding State
+  const [settings, setSettings] = useState<AppSettings>({
+    appTitle: 'GP 2026 Finance',
+    subTitle: 'gp2026.luhurachati.com',
+    logoUrl: '/icon-192.png',
+    themeColor: 'AMBER_ORANGE',
+    targetGoalAmount: 200000,
+    targetGoalLabel: 'Target Fund Goal',
+    collectionButtonLabel: '+ Collection',
+    spendButtonLabel: '+ Spend / Bill',
+    handoverButtonLabel: 'Handover Cash'
+  });
+
+  const [settingsMsg, setSettingsMsg] = useState('');
 
   // Super Admin Role Management state
   const [roleAssignments, setRoleAssignments] = useState<RoleAssignment[]>([]);
@@ -124,6 +141,7 @@ export default function HomePage() {
       setLoading(true);
       const res = await fetch('/api/finance');
       const data = await res.json();
+      if (data.settings) setSettings(data.settings);
       setSummary(data.summary);
       setCollectorBalances(data.collectorBalances);
       setContributions(data.latestContributions);
@@ -156,6 +174,38 @@ export default function HomePage() {
       }
     }
   }, [session]);
+
+  const handleUpdateSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSettingsMsg('');
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSettingsMsg('Branding & Customization saved successfully!');
+        fetchFinanceData();
+      } else {
+        setSettingsMsg(`Error: ${data.error || 'Failed to save settings'}`);
+      }
+    } catch (err: any) {
+      setSettingsMsg(`Error: ${err.message}`);
+    }
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSettings({ ...settings, logoUrl: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleAssignRole = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -302,18 +352,35 @@ export default function HomePage() {
   };
 
   const generateWhatsAppShare = (c: Contribution) => {
-    const text = `*Ganesh Puja 2026 Payment Receipt* 🐘\n\n` +
+    const text = `*${settings.appTitle} Payment Receipt* 🐘\n\n` +
       `Receipt No: *${c.receiptNo}*\n` +
       `Received From: *${c.memberName} (${c.memberFlat})*\n` +
       `Amount Received: *₹${c.amount.toLocaleString()}*\n` +
       `Payment Mode: *${c.paymentMode}*\n` +
       `Collector: *${c.collectorName}*\n` +
       `Date: *${new Date(c.date).toLocaleDateString()}*\n\n` +
-      `Thank you for your generous contribution to Ganesh Puja 2026!\n` +
+      `Thank you for your generous contribution!\n` +
       `View portal: https://gp2026.luhurachati.com`;
     
     return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
   };
+
+  // Dynamic Theme Colors
+  const getThemeClasses = () => {
+    switch (settings.themeColor) {
+      case 'EMERALD_GREEN':
+        return { primary: 'from-emerald-500 to-teal-600', text: 'text-emerald-400', bg: 'bg-emerald-600', border: 'border-emerald-500/30' };
+      case 'SLATE_BLUE':
+        return { primary: 'from-blue-500 to-indigo-600', text: 'text-blue-400', bg: 'bg-blue-600', border: 'border-blue-500/30' };
+      case 'PURPLE_GOLD':
+        return { primary: 'from-purple-500 to-amber-500', text: 'text-purple-400', bg: 'bg-purple-600', border: 'border-purple-500/30' };
+      case 'AMBER_ORANGE':
+      default:
+        return { primary: 'from-orange-500 to-amber-400', text: 'text-orange-400', bg: 'bg-orange-600', border: 'border-orange-500/30' };
+    }
+  };
+
+  const theme = getThemeClasses();
 
   if (status === 'loading') {
     return (
@@ -328,12 +395,16 @@ export default function HomePage() {
   if (!session) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] px-4 text-center space-y-5">
-        <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center font-bold text-3xl text-slate-950 shadow-2xl animate-bounce">
-          🐘
-        </div>
+        {settings.logoUrl ? (
+          <img src={settings.logoUrl} alt="Logo" className="w-20 h-20 rounded-2xl border border-amber-500/30 object-cover shadow-2xl animate-bounce" />
+        ) : (
+          <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center font-bold text-3xl text-slate-950 shadow-2xl animate-bounce">
+            🐘
+          </div>
+        )}
 
         <div className="space-y-1">
-          <h2 className="text-xl font-extrabold text-slate-100">Ganesh Puja 2026</h2>
+          <h2 className="text-xl font-extrabold text-slate-100">{settings.appTitle}</h2>
           <p className="text-xs text-orange-400 font-semibold uppercase tracking-wider">Financial Transparency Portal</p>
           <p className="text-[11px] text-slate-400 max-w-xs pt-1">
             Access to collection records, treasury vaults, and reimbursement ledgers is restricted to verified members.
@@ -356,7 +427,7 @@ export default function HomePage() {
             <span>Sign in with Google Account</span>
           </button>
 
-          <p className="text-[10px] text-slate-500">Authorized redirect: gp2026.luhurachati.com</p>
+          <p className="text-[10px] text-slate-500">Authorized redirect: {settings.subTitle}</p>
         </div>
       </div>
     );
@@ -369,7 +440,7 @@ export default function HomePage() {
   const isMember = userRole === 'MEMBER' || isCollector;
   const isViewOnly = userRole === 'VIEW_ONLY';
 
-  const targetProgress = summary ? Math.min(100, Math.round((summary.totalCollected / summary.targetGoal) * 100)) : 0;
+  const targetProgress = summary ? Math.min(100, Math.round((summary.totalCollected / (summary.targetGoal || 200000)) * 100)) : 0;
 
   return (
     <div className="space-y-4">
@@ -412,12 +483,12 @@ export default function HomePage() {
       {/* Target Goal & Quick Actions Header */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
         <div className="flex justify-between items-center mb-2">
-          <span className="text-xs font-semibold text-orange-400 uppercase tracking-wider">Target Fund Goal</span>
-          <span className="text-xs font-bold text-slate-300">₹{summary?.totalCollected.toLocaleString()} / ₹{summary?.targetGoal.toLocaleString()}</span>
+          <span className={`text-xs font-semibold ${theme.text} uppercase tracking-wider`}>{settings.targetGoalLabel}</span>
+          <span className="text-xs font-bold text-slate-300">₹{summary?.totalCollected.toLocaleString()} / ₹{(summary?.targetGoal || 200000).toLocaleString()}</span>
         </div>
         
         <div className="w-full bg-slate-800 rounded-full h-3 mb-3 overflow-hidden p-0.5 border border-slate-700">
-          <div className="bg-gradient-to-r from-orange-500 to-amber-400 h-2 rounded-full transition-all duration-500 shadow-sm" style={{ width: `${targetProgress}%` }}></div>
+          <div className={`bg-gradient-to-r ${theme.primary} h-2 rounded-full transition-all duration-500 shadow-sm`} style={{ width: `${targetProgress}%` }}></div>
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-center text-xs">
@@ -431,7 +502,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Action Buttons - Role Scoped */}
+        {/* Action Buttons - Role Scoped & Label Customized */}
         <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-800/80">
           {isCollector ? (
             <button 
@@ -439,12 +510,12 @@ export default function HomePage() {
               className="flex flex-col items-center justify-center p-2 rounded-xl bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/30 text-orange-300 text-[11px] font-medium transition"
             >
               <PlusCircle className="w-4 h-4 mb-1 text-orange-400" />
-              + Collection
+              {settings.collectionButtonLabel}
             </button>
           ) : (
             <div className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-800/40 border border-slate-800 text-slate-600 text-[11px] font-medium cursor-not-allowed">
               <Lock className="w-4 h-4 mb-1 text-slate-600" />
-              + Collection
+              {settings.collectionButtonLabel}
             </div>
           )}
 
@@ -454,12 +525,12 @@ export default function HomePage() {
               className="flex flex-col items-center justify-center p-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-rose-300 text-[11px] font-medium transition"
             >
               <TrendingDown className="w-4 h-4 mb-1 text-rose-400" />
-              + Spend / Bill
+              {settings.spendButtonLabel}
             </button>
           ) : (
             <div className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-800/40 border border-slate-800 text-slate-600 text-[11px] font-medium cursor-not-allowed">
               <Lock className="w-4 h-4 mb-1 text-slate-600" />
-              + Spend / Bill
+              {settings.spendButtonLabel}
             </div>
           )}
 
@@ -477,36 +548,44 @@ export default function HomePage() {
       <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1 shadow-inner text-xs font-medium overflow-x-auto">
         <button 
           onClick={() => setActiveTab('overview')} 
-          className={`flex-1 py-2 px-3 rounded-lg text-center whitespace-nowrap transition ${activeTab === 'overview' ? 'bg-orange-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-slate-200'}`}
+          className={`flex-1 py-2 px-3 rounded-lg text-center whitespace-nowrap transition ${activeTab === 'overview' ? `${theme.bg} text-white font-bold shadow` : 'text-slate-400 hover:text-slate-200'}`}
         >
           Overview
         </button>
         <button 
           onClick={() => setActiveTab('collectors')} 
-          className={`flex-1 py-2 px-3 rounded-lg text-center whitespace-nowrap transition ${activeTab === 'collectors' ? 'bg-orange-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-slate-200'}`}
+          className={`flex-1 py-2 px-3 rounded-lg text-center whitespace-nowrap transition ${activeTab === 'collectors' ? `${theme.bg} text-white font-bold shadow` : 'text-slate-400 hover:text-slate-200'}`}
         >
           Collectors
         </button>
         <button 
           onClick={() => setActiveTab('contributions')} 
-          className={`flex-1 py-2 px-3 rounded-lg text-center whitespace-nowrap transition ${activeTab === 'contributions' ? 'bg-orange-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-slate-200'}`}
+          className={`flex-1 py-2 px-3 rounded-lg text-center whitespace-nowrap transition ${activeTab === 'contributions' ? `${theme.bg} text-white font-bold shadow` : 'text-slate-400 hover:text-slate-200'}`}
         >
           Collections
         </button>
         <button 
           onClick={() => setActiveTab('expenses')} 
-          className={`flex-1 py-2 px-3 rounded-lg text-center whitespace-nowrap transition ${activeTab === 'expenses' ? 'bg-orange-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-slate-200'}`}
+          className={`flex-1 py-2 px-3 rounded-lg text-center whitespace-nowrap transition ${activeTab === 'expenses' ? `${theme.bg} text-white font-bold shadow` : 'text-slate-400 hover:text-slate-200'}`}
         >
           Expenses
         </button>
 
         {isSuperAdmin && (
-          <button 
-            onClick={() => setActiveTab('admin')} 
-            className={`flex-1 py-2 px-3 rounded-lg text-center whitespace-nowrap transition ${activeTab === 'admin' ? 'bg-purple-600 text-white font-bold shadow' : 'text-purple-400 hover:text-purple-200'}`}
-          >
-            User Roles
-          </button>
+          <>
+            <button 
+              onClick={() => setActiveTab('admin')} 
+              className={`flex-1 py-2 px-3 rounded-lg text-center whitespace-nowrap transition ${activeTab === 'admin' ? 'bg-purple-600 text-white font-bold shadow' : 'text-purple-400 hover:text-purple-200'}`}
+            >
+              Roles
+            </button>
+            <button 
+              onClick={() => setActiveTab('branding')} 
+              className={`flex-1 py-2 px-3 rounded-lg text-center whitespace-nowrap transition ${activeTab === 'branding' ? 'bg-amber-600 text-white font-bold shadow' : 'text-amber-400 hover:text-amber-200'}`}
+            >
+              Branding
+            </button>
+          </>
         )}
       </div>
 
@@ -576,7 +655,7 @@ export default function HomePage() {
                   onClick={() => setShowAddHandover(true)}
                   className="text-xs px-2.5 py-1 rounded bg-cyan-600 text-white font-medium shadow"
                 >
-                  + Handover Cash
+                  + {settings.handoverButtonLabel}
                 </button>
               )}
             </div>
@@ -640,7 +719,7 @@ export default function HomePage() {
                 onClick={() => setShowAddContribution(true)}
                 className="text-xs px-2.5 py-1 rounded bg-orange-600 text-white font-medium shadow"
               >
-                + Record
+                {settings.collectionButtonLabel}
               </button>
             )}
           </div>
@@ -684,7 +763,7 @@ export default function HomePage() {
                 onClick={() => setShowAddExpense(true)}
                 className="text-xs px-2.5 py-1 rounded bg-rose-600 text-white font-medium shadow"
               >
-                + Record Spend
+                {settings.spendButtonLabel}
               </button>
             )}
           </div>
@@ -720,7 +799,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* TAB CONTENT: Super Admin Panel */}
+      {/* TAB CONTENT: Super Admin Roles */}
       {activeTab === 'admin' && isSuperAdmin && (
         <div className="bg-slate-900 border border-purple-500/30 rounded-xl p-3 shadow-md space-y-4">
           <div className="flex items-center space-x-2">
@@ -769,23 +848,113 @@ export default function HomePage() {
               </p>
             )}
           </form>
+        </div>
+      )}
 
-          <div className="space-y-2">
-            <h4 className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Current Role Registry</h4>
-            <div className="divide-y divide-slate-800 text-xs">
-              {roleAssignments.map((ra) => (
-                <div key={ra.email} className="py-2 flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-slate-200">{ra.email}</p>
-                    <p className="text-[10px] text-slate-500">Assigned by {ra.assignedBy}</p>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                    {ra.role}
-                  </span>
-                </div>
-              ))}
+      {/* TAB CONTENT: Super Admin Branding & Labels Console */}
+      {activeTab === 'branding' && isSuperAdmin && (
+        <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-3 shadow-md space-y-4 text-xs">
+          <div className="flex items-center space-x-2">
+            <Sliders className="w-5 h-5 text-amber-400" />
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-300">App Branding & Custom Labels</h3>
+              <p className="text-[10px] text-slate-400">Customize logos, color themes, and form button labels</p>
             </div>
           </div>
+
+          <form onSubmit={handleUpdateSettings} className="space-y-3 bg-slate-850 p-3 rounded-xl border border-slate-800">
+            {/* Logo Image Upload */}
+            <div>
+              <label className="block text-slate-400 mb-1 font-semibold flex items-center gap-1">
+                <ImageIcon className="w-3.5 h-3.5 text-amber-400" /> App Logo Image
+              </label>
+              <div className="flex items-center space-x-3">
+                {settings.logoUrl && (
+                  <img src={settings.logoUrl} alt="Logo Preview" className="w-10 h-10 rounded-lg object-cover border border-amber-500/30" />
+                )}
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="w-full text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-amber-600 file:text-white hover:file:bg-amber-500"
+                />
+              </div>
+            </div>
+
+            {/* Color Theme Selector */}
+            <div>
+              <label className="block text-slate-400 mb-1 font-semibold flex items-center gap-1">
+                <Palette className="w-3.5 h-3.5 text-amber-400" /> Visual Color Theme
+              </label>
+              <select 
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-amber-500 font-bold"
+                value={settings.themeColor}
+                onChange={(e) => setSettings({ ...settings, themeColor: e.target.value as any })}
+              >
+                <option value="AMBER_ORANGE">Amber Orange (Puja Warm Gold - Default)</option>
+                <option value="EMERALD_GREEN">Emerald Green (Royal Prosperity)</option>
+                <option value="SLATE_BLUE">Slate Blue (Modern Minimalist)</option>
+                <option value="PURPLE_GOLD">Purple Gold (Festive Premium)</option>
+              </select>
+            </div>
+
+            {/* Application Titles */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-slate-400 mb-1">App Title</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-amber-500"
+                  value={settings.appTitle}
+                  onChange={(e) => setSettings({ ...settings, appTitle: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-slate-400 mb-1">Target Amount (₹)</label>
+                <input 
+                  type="number" 
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-amber-500 font-bold text-emerald-400"
+                  value={settings.targetGoalAmount}
+                  onChange={(e) => setSettings({ ...settings, targetGoalAmount: parseFloat(e.target.value) || 0 })}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Custom Button & Progress Labels */}
+            <div className="space-y-2 pt-1 border-t border-slate-800">
+              <p className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">Custom UI Button Labels</p>
+              <div>
+                <label className="block text-slate-400 mb-1">Collection Button Label</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-amber-500"
+                  value={settings.collectionButtonLabel}
+                  onChange={(e) => setSettings({ ...settings, collectionButtonLabel: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-slate-400 mb-1">Spend / Bill Button Label</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-amber-500"
+                  value={settings.spendButtonLabel}
+                  onChange={(e) => setSettings({ ...settings, spendButtonLabel: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <button type="submit" className="w-full py-2.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold transition shadow-lg">
+              Save Branding & Label Customizations
+            </button>
+
+            {settingsMsg && (
+              <p className={`text-[11px] p-2 rounded text-center ${settingsMsg.startsWith('Error') ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                {settingsMsg}
+              </p>
+            )}
+          </form>
         </div>
       )}
 
@@ -793,12 +962,16 @@ export default function HomePage() {
       {selectedReceipt && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-amber-500/30 w-full max-w-xs rounded-2xl p-5 shadow-2xl space-y-4 text-center">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 mx-auto flex items-center justify-center font-bold text-xl text-slate-950 shadow-lg">
-              🐘
-            </div>
+            {settings.logoUrl ? (
+              <img src={settings.logoUrl} alt="Logo" className="w-12 h-12 rounded-full mx-auto border border-amber-500/30 object-cover shadow-lg" />
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 mx-auto flex items-center justify-center font-bold text-xl text-slate-950 shadow-lg">
+                🐘
+              </div>
+            )}
             
             <div>
-              <h3 className="text-base font-bold text-slate-100">Ganesh Puja 2026</h3>
+              <h3 className="text-base font-bold text-slate-100">{settings.appTitle}</h3>
               <p className="text-xs text-orange-400 font-medium">Official Digital Receipt</p>
               <p className="text-[10px] text-slate-500 font-mono mt-0.5">{selectedReceipt.receiptNo}</p>
             </div>
@@ -852,7 +1025,7 @@ export default function HomePage() {
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-4 shadow-2xl space-y-3">
             <h3 className="text-sm font-bold text-slate-100 flex justify-between items-center">
-              <span>+ Record Contribution</span>
+              <span>{settings.collectionButtonLabel}</span>
               <button onClick={() => setShowAddContribution(false)} className="text-slate-400 text-xs">✕</button>
             </h3>
             <form onSubmit={handleAddContribution} className="space-y-2.5 text-xs">
@@ -916,7 +1089,7 @@ export default function HomePage() {
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-4 shadow-2xl space-y-3">
             <h3 className="text-sm font-bold text-slate-100 flex justify-between items-center">
-              <span>+ Record Spend / Expense</span>
+              <span>{settings.spendButtonLabel}</span>
               <button onClick={() => setShowAddExpense(false)} className="text-slate-400 text-xs">✕</button>
             </h3>
             <form onSubmit={handleAddExpense} className="space-y-2.5 text-xs">
@@ -984,7 +1157,7 @@ export default function HomePage() {
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-4 shadow-2xl space-y-3">
             <h3 className="text-sm font-bold text-slate-100 flex justify-between items-center">
-              <span>Handover Cash to Treasurer</span>
+              <span>{settings.handoverButtonLabel}</span>
               <button onClick={() => setShowAddHandover(false)} className="text-slate-400 text-xs">✕</button>
             </h3>
             <form onSubmit={handleAddHandover} className="space-y-2.5 text-xs">

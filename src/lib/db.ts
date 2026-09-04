@@ -1,6 +1,18 @@
 import fs from 'fs';
 import path from 'path';
 
+export interface AppSettings {
+  appTitle: string;
+  subTitle: string;
+  logoUrl?: string;
+  themeColor: 'AMBER_ORANGE' | 'EMERALD_GREEN' | 'SLATE_BLUE' | 'PURPLE_GOLD';
+  targetGoalAmount: number;
+  targetGoalLabel: string;
+  collectionButtonLabel: string;
+  spendButtonLabel: string;
+  handoverButtonLabel: string;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -58,6 +70,7 @@ export interface Expense {
 }
 
 export interface DatabaseSchema {
+  settings: AppSettings;
   users: User[];
   roleAssignments: Record<string, UserRoleAssignment>;
   contributions: Contribution[];
@@ -69,7 +82,20 @@ const dbPath = path.join(process.cwd(), 'data', 'db.json');
 
 const SUPER_ADMIN_EMAIL = 'luhurenbaiclub@gmail.com';
 
+const defaultSettings: AppSettings = {
+  appTitle: 'GP 2026 Finance',
+  subTitle: 'gp2026.luhurachati.com',
+  logoUrl: '/icon-192.png',
+  themeColor: 'AMBER_ORANGE',
+  targetGoalAmount: 200000,
+  targetGoalLabel: 'Target Fund Goal',
+  collectionButtonLabel: '+ Collection',
+  spendButtonLabel: '+ Spend / Bill',
+  handoverButtonLabel: 'Handover Cash'
+};
+
 const initialData: DatabaseSchema = {
+  settings: defaultSettings,
   users: [
     { id: 'usr-0', name: 'Super Admin', email: SUPER_ADMIN_EMAIL, role: 'SUPER_ADMIN', flatNo: 'Admin', phone: '+919999999999', createdAt: new Date().toISOString() },
     { id: 'usr-1', name: 'Rajesh Sharma (Treasurer)', email: 'treasurer@gp2026.com', role: 'TREASURER', flatNo: 'A-401', phone: '+919876543210', createdAt: new Date().toISOString() },
@@ -104,6 +130,9 @@ export function getDb(): DatabaseSchema {
   try {
     const raw = fs.readFileSync(dbPath, 'utf8');
     const parsed = JSON.parse(raw);
+    if (!parsed.settings) {
+      parsed.settings = defaultSettings;
+    }
     if (!parsed.roleAssignments) {
       parsed.roleAssignments = initialData.roleAssignments;
     }
@@ -130,6 +159,5 @@ export function getUserRole(email: string | null | undefined): 'SUPER_ADMIN' | '
     return assignment.role;
   }
 
-  // Default for first-time login
   return 'VIEW_ONLY';
 }

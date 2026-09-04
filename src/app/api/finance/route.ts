@@ -68,13 +68,14 @@ export async function GET(req: Request) {
     });
 
   return NextResponse.json({
+    settings: db.settings,
     summary: {
       totalCollected,
       totalSpent,
       netTreasuryBalance: totalCollected - totalSpent,
       pendingHandovers,
       pendingReimbursements,
-      targetGoal: 200000
+      targetGoal: db.settings?.targetGoalAmount || 200000
     },
     collectorBalances,
     latestContributions: db.contributions.slice().reverse(),
@@ -92,7 +93,6 @@ export async function POST(req: Request) {
     const db = getDb();
     const { type, data } = body;
 
-    // VIEW_ONLY users are strictly prohibited from performing write operations
     if (userRole === 'VIEW_ONLY') {
       return NextResponse.json({ error: 'Forbidden. VIEW_ONLY users cannot perform mutations.' }, { status: 403 });
     }
