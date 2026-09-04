@@ -11,6 +11,7 @@ export interface AppSettings {
   collectionButtonLabel: string;
   spendButtonLabel: string;
   handoverButtonLabel: string;
+  areaOptions: string[];
 }
 
 export interface User {
@@ -113,7 +114,8 @@ const defaultSettings: AppSettings = {
   targetGoalLabel: 'Target Fund Goal',
   collectionButtonLabel: '+ Collection',
   spendButtonLabel: '+ Spend / Bill',
-  handoverButtonLabel: 'Handover Cash'
+  handoverButtonLabel: 'Handover Cash',
+  areaOptions: ['Sector 1 / Wing A', 'Sector 2 / Wing B', 'Sector 3 / Wing C', 'General Area']
 };
 
 const initialData: DatabaseSchema = {
@@ -142,6 +144,9 @@ export function getDb(): DatabaseSchema {
     const raw = fs.readFileSync(dbPath, 'utf8');
     const parsed = JSON.parse(raw);
     if (!parsed.settings) parsed.settings = defaultSettings;
+    if (!parsed.settings.areaOptions || !Array.isArray(parsed.settings.areaOptions)) {
+      parsed.settings.areaOptions = defaultSettings.areaOptions;
+    }
     if (!parsed.roleAssignments) parsed.roleAssignments = initialData.roleAssignments;
     if (!parsed.notifications) parsed.notifications = [];
     return parsed;

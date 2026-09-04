@@ -115,7 +115,8 @@ export default function HomePage() {
     targetGoalLabel: 'Target Fund Goal',
     collectionButtonLabel: '+ Collection',
     spendButtonLabel: '+ Spend / Bill',
-    handoverButtonLabel: 'Handover Cash'
+    handoverButtonLabel: 'Handover Cash',
+    areaOptions: ['Sector 1 / Wing A', 'Sector 2 / Wing B', 'Sector 3 / Wing C', 'General Area']
   });
 
   const [settingsMsg, setSettingsMsg] = useState('');
@@ -1248,6 +1249,21 @@ export default function HomePage() {
               </div>
             </div>
 
+            <div>
+              <label className="block text-slate-400 mb-1 font-semibold">Configured Area / Wing Options (Comma-separated)</label>
+              <input 
+                type="text" 
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-amber-500 font-mono text-xs"
+                placeholder="Sector 1 / Wing A, Sector 2 / Wing B, General Area"
+                value={(settings.areaOptions || []).join(', ')}
+                onChange={(e) => {
+                  const opts = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                  setSettings({ ...settings, areaOptions: opts });
+                }}
+              />
+              <p className="text-[9px] text-slate-500 mt-1">These options will populate dropdown selections in collection forms.</p>
+            </div>
+
             <button type="submit" className="w-full py-2.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold transition shadow-lg">
               Save Branding & Label Customizations
             </button>
@@ -1284,13 +1300,16 @@ export default function HomePage() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-slate-400 mb-1">Area / Wing</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Wing A"
-                    className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-orange-500"
+                  <select 
+                    className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-orange-500 font-medium"
                     value={selfContribForm.memberArea}
                     onChange={(e) => setSelfContribForm({ ...selfContribForm, memberArea: e.target.value })}
-                  />
+                  >
+                    <option value="">Select Area / Wing</option>
+                    {(settings.areaOptions || []).map((area, idx) => (
+                      <option key={idx} value={area}>{area}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-slate-400 mb-1">Payment Mode</label>
@@ -1487,13 +1506,16 @@ export default function HomePage() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-slate-400 mb-1">Area / Wing</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Sector 2 / Wing A"
-                    className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-orange-500"
+                  <select 
+                    className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-orange-500 font-medium"
                     value={contribForm.memberArea}
                     onChange={(e) => setContribForm({ ...contribForm, memberArea: e.target.value })}
-                  />
+                  >
+                    <option value="">Select Area / Wing</option>
+                    {(settings.areaOptions || []).map((area, idx) => (
+                      <option key={idx} value={area}>{area}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-slate-400 mb-1">Amount (₹)</label>
@@ -1618,13 +1640,16 @@ export default function HomePage() {
               </div>
               <div>
                 <label className="block text-slate-400 mb-1">Collector Area / Wing</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Sector 1 / Wing A"
-                  className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-cyan-500"
+                <select 
+                  className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-cyan-500 font-medium"
                   value={handoverForm.collectorArea}
                   onChange={(e) => setHandoverForm({ ...handoverForm, collectorArea: e.target.value })}
-                />
+                >
+                  <option value="">Select Collector Area</option>
+                  {(settings.areaOptions || []).map((area, idx) => (
+                    <option key={idx} value={area}>{area}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-slate-400 mb-1">Notes / Description</label>
