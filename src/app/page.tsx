@@ -145,7 +145,7 @@ export default function HomePage() {
 
   // Modals & Receipts
   const [showAddContribution, setShowAddContribution] = useState(false);
-  const [showSelfContribution, setShowSelfContribution] = useState(false);
+  const [showRemindCollector, setShowRemindCollector] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showAddHandover, setShowAddHandover] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Contribution | null>(null);
@@ -310,7 +310,6 @@ export default function HomePage() {
 
     const result = await res.json();
     if (res.ok) {
-      setShowSelfContribution(false);
       setSelfContribForm({ amount: '', paymentMode: 'UPI', memberArea: '', taggedCollectorEmail: '', note: '' });
       fetchFinanceData();
       alert(result.status === 'APPROVED' 
@@ -700,21 +699,36 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Self-Contribution Quick Action Banner for ALL Users */}
-      <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 border border-orange-400 p-4 rounded-3xl flex items-center justify-between shadow-md text-white">
-        <div>
-          <h3 className="text-sm font-extrabold flex items-center gap-1.5 text-white drop-shadow-xs">
-            <PlusCircle className="w-4 h-4 text-amber-200" /> Record My Contribution
-          </h3>
-          <p className="text-xs text-amber-100 font-medium">Contribute directly and tag your area collector for instant verification</p>
+      {/* View-Only User Membership Notice */}
+      {isViewOnly && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-5 shadow-sm space-y-3">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-white text-lg font-bold shadow-xs shrink-0">
+              🪔
+            </div>
+            <div>
+              <h3 className="font-extrabold text-slate-900 text-sm">View-Only Guest Access</h3>
+              <p className="text-xs text-slate-600 font-medium">Want to log expenses or contribute as an active member?</p>
+            </div>
+          </div>
+          <div className="bg-white border border-amber-200/80 rounded-2xl p-3.5 text-xs text-slate-700 space-y-1.5">
+            <p className="font-semibold text-slate-800">
+              <strong>Notice:</strong> Only designated Area Collectors can record official Chanda collection entries.
+            </p>
+            <p className="text-slate-600 leading-relaxed">
+              If you wish to log expenses or get full active status, please ask your Area Collector or Super Admin to assign your email address **Member** access.
+            </p>
+            <div className="pt-1">
+              <a 
+                href="mailto:luhurenbaiclub@gmail.com?subject=Request%20for%20Ganesh%20Puja%20LBC%20Member%20Access" 
+                className="text-orange-600 font-extrabold hover:underline text-xs inline-flex items-center gap-1"
+              >
+                <span>✉️ Request Membership Access via Email &rarr;</span>
+              </a>
+            </div>
+          </div>
         </div>
-        <button 
-          onClick={() => setShowSelfContribution(true)}
-          className="px-4 py-2 rounded-2xl bg-white text-slate-900 font-black text-xs shadow-md hover:bg-amber-50 transition transform active:scale-95 whitespace-nowrap ml-2"
-        >
-          + Pay Chanda
-        </button>
-      </div>
+      )}
 
       {/* Target Goal & Quick Actions Header */}
       <div className="bg-white border border-amber-200/80 rounded-3xl p-5 shadow-sm space-y-4">
@@ -739,7 +753,7 @@ export default function HomePage() {
         </div>
 
         {/* Action Buttons - Role Scoped */}
-        <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-slate-100">
           {isCollector ? (
             <button 
               onClick={() => setShowAddContribution(true)}
@@ -749,7 +763,7 @@ export default function HomePage() {
               {settings.collectionButtonLabel}
             </button>
           ) : (
-            <div className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-slate-400 text-xs font-bold cursor-not-allowed">
+            <div className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-slate-400 text-xs font-bold cursor-not-allowed" title="Only Collectors can record contributions">
               <Lock className="w-4.5 h-4.5 mb-1 text-slate-400" />
               {settings.collectionButtonLabel}
             </div>
@@ -764,11 +778,19 @@ export default function HomePage() {
               {settings.spendButtonLabel}
             </button>
           ) : (
-            <div className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-slate-400 text-xs font-bold cursor-not-allowed">
+            <div className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-slate-400 text-xs font-bold cursor-not-allowed" title="Only Members can log expenses">
               <Lock className="w-4.5 h-4.5 mb-1 text-slate-400" />
               {settings.spendButtonLabel}
             </div>
           )}
+
+          <button 
+            onClick={() => setShowRemindCollector(true)}
+            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 text-xs font-bold transition shadow-xs"
+          >
+            <Bell className="w-4.5 h-4.5 mb-1 text-amber-600" />
+            Remind Collector
+          </button>
 
           <a 
             href="/api/finance?format=csv"
@@ -1501,86 +1523,69 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* MODAL: RECORD MY OWN CONTRIBUTION */}
-      {showSelfContribution && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
-          <div className="bg-slate-900 border border-amber-500/30 w-full max-w-sm rounded-2xl p-4 shadow-2xl space-y-3">
-            <h3 className="text-sm font-bold text-slate-100 flex justify-between items-center">
-              <span>+ Record My Contribution</span>
-              <button onClick={() => setShowSelfContribution(false)} className="text-slate-400 text-xs">✕</button>
-            </h3>
-            <form onSubmit={handleSelfContributionSubmit} className="space-y-2.5 text-xs">
-              <div>
-                <label className="block text-slate-400 mb-1">Contribution Amount (₹)</label>
-                <input 
-                  type="number" 
-                  placeholder="5000"
-                  className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-orange-500 font-bold text-orange-400"
-                  value={selfContribForm.amount}
-                  onChange={(e) => setSelfContribForm({ ...selfContribForm, amount: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-slate-400 mb-1">Area / Wing</label>
-                  <select 
-                    className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-orange-500 font-medium"
-                    value={selfContribForm.memberArea}
-                    onChange={(e) => setSelfContribForm({ ...selfContribForm, memberArea: e.target.value })}
-                  >
-                    <option value="">Select Area / Wing</option>
-                    {(settings.areaOptions || []).map((area, idx) => (
-                      <option key={idx} value={area}>{area}</option>
-                    ))}
-                  </select>
+      {/* MODAL: REMIND AREA COLLECTOR TO RECORD CONTRIBUTION */}
+      {showRemindCollector && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-amber-200/80 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                  <Bell className="w-4 h-4" />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">Payment Mode</label>
-                  <select 
-                    className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-orange-500"
-                    value={selfContribForm.paymentMode}
-                    onChange={(e) => setSelfContribForm({ ...selfContribForm, paymentMode: e.target.value as any })}
-                  >
-                    <option value="UPI">UPI / QR Scan</option>
-                    <option value="CASH">Cash in hand</option>
-                    <option value="BANK_TRANSFER">Bank NetBanking</option>
-                  </select>
+                  <h3 className="text-sm font-black text-slate-900">Remind Collector to Record Contribution</h3>
+                  <p className="text-[10px] text-slate-500">Send a quick WhatsApp message to your Area Collector</p>
+                </div>
+              </div>
+              <button onClick={() => setShowRemindCollector(false)} className="text-slate-400 hover:text-slate-600 text-sm font-bold p-1">✕</button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <p className="text-slate-600 font-medium leading-relaxed">
+                Paid your Ganesh Puja 2026 Chanda contribution? Select your Area Collector below to send them a pre-filled WhatsApp reminder to log your payment into the official portal.
+              </p>
+
+              <div className="space-y-2">
+                <label className="block font-extrabold text-slate-800 text-xs">Select Area Collector</label>
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  {collectorBalances.length === 0 ? (
+                    <p className="text-slate-500 italic py-2 text-center">No collectors registered yet.</p>
+                  ) : (
+                    collectorBalances.map((collector) => (
+                      <div key={collector.collectorId} className="p-3 rounded-2xl bg-amber-50/60 border border-amber-200/60 flex items-center justify-between">
+                        <div>
+                          <p className="font-extrabold text-slate-900">{collector.collectorName}</p>
+                          <p className="text-[10px] text-slate-600 font-medium">Area: <span className="text-orange-700 font-bold">{collector.collectorArea}</span></p>
+                          <p className="text-[10px] text-slate-500">{collector.collectorId}</p>
+                        </div>
+                        <a
+                          href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                            `Jai Ganesh! 🚩 Hi ${collector.collectorName}, I have contributed my Ganesh Puja 2026 Chanda. Please record my contribution in the Ganesh Puja - LBC portal: https://gp2026.luhurachati.com`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] shadow-xs flex items-center space-x-1 whitespace-nowrap"
+                        >
+                          <span>💬 WhatsApp</span>
+                        </a>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
-              <div>
-                <label className="block text-slate-400 mb-1">Tag Collector / Treasurer to Verify</label>
-                <select 
-                  className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-orange-500 font-bold"
-                  value={selfContribForm.taggedCollectorEmail}
-                  onChange={(e) => setSelfContribForm({ ...selfContribForm, taggedCollectorEmail: e.target.value })}
-                  required
-                >
-                  {collectorsList.map((c) => (
-                    <option key={c.email} value={c.email}>
-                      {c.name} ({c.role})
-                    </option>
-                  ))}
-                </select>
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 text-[11px] text-slate-600 space-y-1">
+                <p className="font-bold text-slate-800">💡 Don't see your collector?</p>
+                <p>Contact the Super Admin at <a href="mailto:luhurenbaiclub@gmail.com" className="text-orange-600 font-bold underline">luhurenbaiclub@gmail.com</a> to verify your contribution.</p>
               </div>
 
-              <div>
-                <label className="block text-slate-400 mb-1">Payment Ref / Transaction ID / Note</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. UPI Ref: 42398... or Cash handed to Amit"
-                  className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-orange-500"
-                  value={selfContribForm.note}
-                  onChange={(e) => setSelfContribForm({ ...selfContribForm, note: e.target.value })}
-                />
-              </div>
-
-              <div className="pt-2 flex gap-2">
-                <button type="button" onClick={() => setShowSelfContribution(false)} className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 font-medium">Cancel</button>
-                <button type="submit" className="flex-1 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-amber-400 text-slate-950 font-bold">Submit Contribution</button>
-              </div>
-            </form>
+              <button
+                onClick={() => setShowRemindCollector(false)}
+                className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition"
+              >
+                Close Window
+              </button>
+            </div>
           </div>
         </div>
       )}

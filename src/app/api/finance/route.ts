@@ -120,18 +120,24 @@ export async function POST(req: Request) {
     const { type, data } = body;
 
     // SELF CONTRIBUTION / RECORD CONTRIBUTION WORKFLOW
-    if (type === 'ADD_SELF_CONTRIBUTION' || type === 'ADD_CONTRIBUTION') {
-      const isSelf = type === 'ADD_SELF_CONTRIBUTION';
+    if (type === 'ADD_SELF_CONTRIBUTION') {
+      return NextResponse.json({ error: 'Self-contribution is currently disabled. Please contact your Area Collector to log your contribution.' }, { status: 400 });
+    }
+
+    if (type === 'ADD_CONTRIBUTION') {
+      if (userRole !== 'COLLECTOR' && userRole !== 'TREASURER' && userRole !== 'SUPER_ADMIN') {
+        return NextResponse.json({ error: 'Forbidden: Only authorized Area Collectors can record contributions.' }, { status: 403 });
+      }
+
       let status: 'APPROVED' | 'PENDING_COLLECTOR_APPROVAL' | 'PENDING_SUPER_ADMIN_APPROVAL' = 'APPROVED';
       let approverEmail = data.collectorId;
 
-      // Check if the contribution member is the collector/treasurer themselves or self-contribution
-      const isSelfOrOwnCollection = isSelf || (data.memberId && data.memberId.toLowerCase() === userEmail.toLowerCase()) || (data.memberName && session?.user?.name && data.memberName.trim().toLowerCase() === session.user.name.trim().toLowerCase());
+      // Check if the collector is recording their own contribution (requires Admin approval)
+      const isOwnCollection = (data.memberId && data.memberId.toLowerCase() === userEmail.toLowerCase()) || 
+                             (data.memberName && session?.user?.name && data.memberName.trim().toLowerCase() === session.user.name.trim().toLowerCase());
 
-      if (isSelfOrOwnCollection) {
-        if (userRole === 'VIEW_ONLY' || userRole === 'MEMBER') {
-          status = 'PENDING_COLLECTOR_APPROVAL';
-        } else if (userRole === 'COLLECTOR' || userRole === 'TREASURER') {
+      if (isOwnCollection) {
+        if (userRole === 'COLLECTOR' || userRole === 'TREASURER') {
           status = 'PENDING_SUPER_ADMIN_APPROVAL';
           approverEmail = 'luhurenbaiclub@gmail.com';
         } else if (userRole === 'SUPER_ADMIN') {
@@ -145,7 +151,7 @@ export async function POST(req: Request) {
         date: new Date().toISOString(),
         status,
         approverEmail,
-        isSelfContribution: isSelf,
+        isSelfContribution: false,
         ...data
       };
 
