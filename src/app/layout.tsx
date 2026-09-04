@@ -28,19 +28,19 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-slate-950 text-slate-100 min-h-screen pb-20 antialiased selection:bg-orange-500 selection:text-white select-none">
+      <body className="bg-amber-50/40 text-slate-900 min-h-screen pb-20 antialiased selection:bg-orange-500 selection:text-white select-none">
         <NextAuthProvider>
-          <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-lg">
-            <div className="flex items-center space-x-2">
-              <img src="/icon-192.png" alt="GP2026" className="w-8 h-8 rounded-lg shadow-md border border-amber-500/30 object-cover" />
+          <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-amber-200/60 px-4 py-3 flex items-center justify-between shadow-sm">
+            <div className="flex items-center space-x-3">
+              <img src="/icon-192.png" alt="Ganesh Puja - LBC" className="w-9 h-9 rounded-xl shadow-sm border border-amber-300 object-cover" />
               <div>
-                <h1 className="text-base font-bold tracking-tight leading-none text-slate-100">GP 2026 Finance</h1>
-                <p className="text-[11px] text-slate-400 font-medium">gp2026.luhurachati.com</p>
+                <h1 className="text-base font-extrabold tracking-tight leading-none text-slate-900">Ganesh Puja - LBC</h1>
+                <p className="text-[10px] text-orange-600 font-semibold tracking-wide uppercase pt-0.5">Festive Portal 2026</p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold shadow-xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 PWA Ready
               </span>
             </div>

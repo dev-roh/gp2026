@@ -119,8 +119,8 @@ const dbPath = isVercel ? path.join('/tmp', 'db.json') : path.join(process.cwd()
 const SUPER_ADMIN_EMAIL = 'luhurenbaiclub@gmail.com';
 
 const defaultSettings: AppSettings = {
-  appTitle: 'GP 2026 Finance',
-  subTitle: 'gp2026.luhurachati.com',
+  appTitle: 'Ganesh Puja - LBC',
+  subTitle: 'Luhurachati Club',
   logoUrl: '/icon-192.png',
   themeColor: 'AMBER_ORANGE',
   targetGoalAmount: 200000,
