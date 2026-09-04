@@ -30,35 +30,43 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { targetEmail, newRole } = body;
-
-    if (!targetEmail || !newRole) {
-      return NextResponse.json({ error: 'Target email and new role are required.' }, { status: 400 });
-    }
+    const { targetEmail, targetEmails, newRole } = body;
 
     const validRoles = ['SUPER_ADMIN', 'TREASURER', 'COLLECTOR', 'MEMBER', 'VIEW_ONLY'];
-    if (!validRoles.includes(newRole)) {
+    if (!newRole || !validRoles.includes(newRole)) {
       return NextResponse.json({ error: 'Invalid target role.' }, { status: 400 });
     }
 
     const db = getDb();
-    const normalizedEmail = targetEmail.trim().toLowerCase();
+    const emailsToProcess: string[] = [];
 
-    db.roleAssignments[normalizedEmail] = {
-      email: normalizedEmail,
-      role: newRole,
-      assignedBy: superAdminEmail || 'SUPER_ADMIN',
-      updatedAt: new Date().toISOString()
-    };
-
-    // Update existing user model if present
-    const existingUserIndex = db.users.findIndex(u => u.email.toLowerCase() === normalizedEmail);
-    if (existingUserIndex !== -1) {
-      db.users[existingUserIndex].role = newRole;
+    if (Array.isArray(targetEmails) && targetEmails.length > 0) {
+      emailsToProcess.push(...targetEmails.map((e: string) => e.trim().toLowerCase()).filter(Boolean));
+    } else if (typeof targetEmail === 'string' && targetEmail.trim()) {
+      emailsToProcess.push(targetEmail.trim().toLowerCase());
+    } else {
+      return NextResponse.json({ error: 'Target email or email list is required.' }, { status: 400 });
     }
 
+    let addedCount = 0;
+    emailsToProcess.forEach(email => {
+      db.roleAssignments[email] = {
+        email,
+        role: newRole,
+        assignedBy: superAdminEmail || 'SUPER_ADMIN',
+        updatedAt: new Date().toISOString()
+      };
+
+      // Check if user already registered, update role if present
+      const existingUserIndex = db.users.findIndex(u => u.email.toLowerCase() === email);
+      if (existingUserIndex !== -1) {
+        db.users[existingUserIndex].role = newRole;
+      }
+      addedCount++;
+    });
+
     saveDb(db);
-    return NextResponse.json({ success: true, assignment: db.roleAssignments[normalizedEmail] });
+    return NextResponse.json({ success: true, count: addedCount, message: `Successfully assigned ${newRole} role to ${addedCount} user email(s).` });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

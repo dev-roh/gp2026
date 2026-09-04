@@ -372,25 +372,32 @@ export default function HomePage() {
 
   const handleAssignRole = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!targetEmail) return;
+    if (!targetEmail.trim()) return;
 
     setRoleMsg('');
+    const emailList = targetEmail
+      .split(/[\n,;]+/)
+      .map(email => email.trim())
+      .filter(Boolean);
+
+    if (emailList.length === 0) return;
+
     const res = await fetch('/api/admin/roles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        targetEmail,
+        targetEmails: emailList,
         newRole: selectedRole
       })
     });
 
     const data = await res.json();
     if (res.ok) {
-      setRoleMsg(`Successfully updated role for ${targetEmail} to ${selectedRole}`);
+      setRoleMsg(data.message || `Successfully assigned ${selectedRole} to ${emailList.length} user email(s).`);
       setTargetEmail('');
       fetchRoleAssignments();
     } else {
-      setRoleMsg(`Error: ${data.error || 'Failed to update role'}`);
+      setRoleMsg(`Error: ${data.error || 'Failed to update roles'}`);
     }
   };
 
@@ -1319,15 +1326,16 @@ export default function HomePage() {
 
           <form onSubmit={handleAssignRole} className="space-y-2.5 text-xs bg-slate-850 p-3 rounded-xl border border-slate-800">
             <div>
-              <label className="block text-slate-400 mb-1">User Email Address</label>
-              <input 
-                type="email" 
-                placeholder="e.g. member@gmail.com"
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-purple-500"
+              <label className="block text-slate-400 mb-1 font-semibold">User Email Address(es) - Single or Bulk</label>
+              <textarea 
+                placeholder="Enter single email or paste bulk emails (separated by commas or newlines)&#10;e.g. member1@gmail.com, collector2@gmail.com"
+                rows={3}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-purple-500 font-mono text-[11px]"
                 value={targetEmail}
                 onChange={(e) => setTargetEmail(e.target.value)}
                 required
               />
+              <p className="text-[9px] text-slate-500 mt-0.5">Supports pasting lists from Excel, Google Sheets, or CSV.</p>
             </div>
 
             <div>
@@ -1355,6 +1363,30 @@ export default function HomePage() {
               </p>
             )}
           </form>
+
+          {/* Role Assignments List */}
+          <div className="bg-slate-850 p-3 rounded-xl border border-slate-800 space-y-2">
+            <h4 className="font-bold text-slate-200 text-xs flex justify-between items-center">
+              <span>Pre-Registered Role Assignments ({roleAssignments.length})</span>
+            </h4>
+            {roleAssignments.length === 0 ? (
+              <p className="text-[10px] text-slate-500">No pre-assigned roles yet.</p>
+            ) : (
+              <div className="divide-y divide-slate-800 max-h-48 overflow-y-auto pr-1">
+                {roleAssignments.map((ra) => (
+                  <div key={ra.email} className="py-1.5 flex justify-between items-center text-[11px]">
+                    <div>
+                      <p className="font-mono text-slate-200 text-[10px]">{ra.email}</p>
+                      <p className="text-[9px] text-slate-500">Assigned by: {ra.assignedBy}</p>
+                    </div>
+                    <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold text-[9px] border border-purple-500/30">
+                      {ra.role}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Super Admin Fresh Start Reset Button */}
           <div className="bg-rose-950/40 border border-rose-800/40 rounded-xl p-3 space-y-2">
