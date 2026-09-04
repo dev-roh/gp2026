@@ -90,6 +90,18 @@ export interface Expense {
   settlementNote?: string;
 }
 
+export interface ProgrammeItem {
+  id: string;
+  title: string;
+  description: string;
+  dateTime: string;
+  location?: string;
+  photoUrl?: string;
+  mediaType?: 'IMAGE' | 'YOUTUBE' | 'INSTAGRAM';
+  embedUrl?: string;
+  createdAt: string;
+}
+
 export interface DatabaseSchema {
   settings: AppSettings;
   users: User[];
@@ -98,6 +110,7 @@ export interface DatabaseSchema {
   notifications: NotificationItem[];
   handovers: Handover[];
   expenses: Expense[];
+  programmes: ProgrammeItem[];
 }
 
 const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
@@ -129,7 +142,8 @@ const initialData: DatabaseSchema = {
   contributions: [],
   notifications: [],
   handovers: [],
-  expenses: []
+  expenses: [],
+  programmes: []
 };
 
 export function getDb(): DatabaseSchema {
@@ -149,6 +163,7 @@ export function getDb(): DatabaseSchema {
     }
     if (!parsed.roleAssignments) parsed.roleAssignments = initialData.roleAssignments;
     if (!parsed.notifications) parsed.notifications = [];
+    if (!parsed.programmes) parsed.programmes = [];
     return parsed;
   } catch (err) {
     console.error('getDb filesystem error:', err);

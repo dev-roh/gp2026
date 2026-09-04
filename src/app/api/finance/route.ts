@@ -100,7 +100,8 @@ export async function GET(req: Request) {
     pendingApprovalsForMe,
     notifications: myNotifications,
     latestExpenses: db.expenses.slice().reverse(),
-    handovers: db.handovers.slice().reverse()
+    handovers: db.handovers.slice().reverse(),
+    programmes: (db.programmes || []).slice().reverse()
   });
 }
 
@@ -274,6 +275,57 @@ export async function POST(req: Request) {
         saveDb(db);
         return NextResponse.json({ success: true, item: exp });
       }
+    }
+
+    // PROGRAMME ACTIVITIES (SUPER ADMIN ONLY)
+    if (type === 'ADD_PROGRAMME') {
+      if (userRole !== 'SUPER_ADMIN') {
+        return NextResponse.json({ error: 'Forbidden. Only Super Admin can post festival programmes.' }, { status: 403 });
+      }
+
+      const { title, description, dateTime, location, photoUrl, mediaType, embedUrl } = data;
+
+      // Security Whitelisting for YouTube & Instagram URL embeds
+      if (mediaType === 'YOUTUBE' && embedUrl) {
+        const isWhitelisted = /^https:\/\/(www\.)?(youtube\.com|youtu\.be)\/.+/i.test(embedUrl);
+        if (!isWhitelisted) {
+          return NextResponse.json({ error: 'Invalid YouTube URL. Only official youtube.com or youtu.be links are allowed.' }, { status: 400 });
+        }
+      }
+
+      if (mediaType === 'INSTAGRAM' && embedUrl) {
+        const isWhitelisted = /^https:\/\/(www\.)?instagram\.com\/(p|reel)\/.+/i.test(embedUrl);
+        if (!isWhitelisted) {
+          return NextResponse.json({ error: 'Invalid Instagram URL. Only official instagram.com/p/ or /reel/ links are allowed.' }, { status: 400 });
+        }
+      }
+
+      const newProg = {
+        id: `prog-${Date.now()}`,
+        title,
+        description,
+        dateTime: dateTime || new Date().toISOString(),
+        location,
+        photoUrl,
+        mediaType: mediaType || 'IMAGE',
+        embedUrl,
+        createdAt: new Date().toISOString()
+      };
+
+      if (!db.programmes) db.programmes = [];
+      db.programmes.push(newProg);
+      saveDb(db);
+      return NextResponse.json({ success: true, item: newProg });
+    }
+
+    if (type === 'DELETE_PROGRAMME') {
+      if (userRole !== 'SUPER_ADMIN') {
+        return NextResponse.json({ error: 'Forbidden. Only Super Admin can remove festival programmes.' }, { status: 403 });
+      }
+      if (!db.programmes) db.programmes = [];
+      db.programmes = db.programmes.filter(p => p.id !== data.programmeId);
+      saveDb(db);
+      return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ error: 'Invalid operation type' }, { status: 400 });

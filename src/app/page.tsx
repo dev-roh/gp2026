@@ -19,9 +19,12 @@ import {
   CheckCircle2,
   Bell,
   UserCheck,
-  Users
+  Users,
+  Calendar,
+  Video,
+  Camera
 } from 'lucide-react';
-import { AppSettings, User as DbUser } from '@/lib/db';
+import { AppSettings, User as DbUser, ProgrammeItem } from '@/lib/db';
 
 interface FinanceSummary {
   totalCollected: number;
@@ -93,7 +96,7 @@ interface RoleAssignment {
 
 export default function HomePage() {
   const { data: session, status } = useSession();
-  const [activeTab, setActiveTab] = useState<'overview' | 'collectors' | 'contributions' | 'expenses' | 'reimbursements' | 'approvals' | 'admin' | 'branding'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'programmes' | 'collectors' | 'contributions' | 'expenses' | 'reimbursements' | 'approvals' | 'admin' | 'branding'>('overview');
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [collectorBalances, setCollectorBalances] = useState<CollectorBalance[]>([]);
@@ -101,6 +104,19 @@ export default function HomePage() {
   const [pendingApprovalsForMe, setPendingApprovalsForMe] = useState<Contribution[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [handovers, setHandovers] = useState<Handover[]>([]);
+  const [programmes, setProgrammes] = useState<ProgrammeItem[]>([]);
+
+  // Programme Form State
+  const [showAddProgramme, setShowAddProgramme] = useState(false);
+  const [programmeForm, setProgrammeForm] = useState({
+    title: '',
+    description: '',
+    dateTime: '',
+    location: '',
+    photoUrl: '',
+    mediaType: 'IMAGE' as 'IMAGE' | 'YOUTUBE' | 'INSTAGRAM',
+    embedUrl: ''
+  });
 
   // Collectors and Treasurers List for tagging
   const [collectorsList, setCollectorsList] = useState<DbUser[]>([]);
@@ -192,11 +208,58 @@ export default function HomePage() {
       setPendingApprovalsForMe(data.pendingApprovalsForMe || []);
       setExpenses(data.latestExpenses);
       setHandovers(data.handovers);
+      setProgrammes(data.programmes || []);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAddProgramme = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!programmeForm.title || !programmeForm.dateTime) return;
+
+    const res = await fetch('/api/finance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'ADD_PROGRAMME',
+        data: programmeForm
+      })
+    });
+
+    const result = await res.json();
+    if (res.ok) {
+      setShowAddProgramme(false);
+      setProgrammeForm({
+        title: '',
+        description: '',
+        dateTime: '',
+        location: '',
+        photoUrl: '',
+        mediaType: 'IMAGE',
+        embedUrl: ''
+      });
+      fetchFinanceData();
+    } else {
+      alert(result.error || 'Failed to add programme');
+    }
+  };
+
+  const handleDeleteProgramme = async (programmeId: string) => {
+    if (!confirm('Are you sure you want to remove this festival programme?')) return;
+    const res = await fetch('/api/finance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'DELETE_PROGRAMME',
+        data: { programmeId }
+      })
+    });
+    const result = await res.json();
+    if (res.ok) fetchFinanceData();
+    else alert(result.error);
   };
 
   const fetchRoleAssignments = async () => {
@@ -714,6 +777,12 @@ export default function HomePage() {
         >
           Overview
         </button>
+        <button 
+          onClick={() => setActiveTab('programmes')} 
+          className={`flex-1 py-2 px-3 rounded-lg text-center whitespace-nowrap transition flex items-center justify-center space-x-1 ${activeTab === 'programmes' ? 'bg-cyan-600 text-white font-bold shadow' : 'text-cyan-400 hover:text-cyan-200'}`}
+        >
+          <span>Schedule & Media</span>
+        </button>
 
         {pendingApprovalsForMe.length > 0 && (
           <button 
@@ -849,7 +918,96 @@ export default function HomePage() {
                 ))}
               </div>
             </div>
+      {/* TAB CONTENT: Schedule & Media (Programmes) */}
+      {activeTab === 'programmes' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-md">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-cyan-400" />
+                Festival Schedule & Media Highlights
+              </h3>
+              <p className="text-[10px] text-slate-400">Events, daily rituals, photos & official video highlights</p>
+            </div>
+            {isSuperAdmin && (
+              <button
+                onClick={() => setShowAddProgramme(true)}
+                className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold text-xs shadow-md transition"
+              >
+                + Add Activity
+              </button>
+            )}
           </div>
+
+          {programmes.length === 0 ? (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-center text-xs text-slate-500 space-y-1">
+              <p className="font-semibold text-slate-400">No festival activities scheduled yet.</p>
+              <p className="text-[10px]">Super Admin can post upcoming rituals, cultural programmes & media links here.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {programmes.map((prog) => (
+                <div key={prog.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-3 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-bold text-slate-100 text-sm">{prog.title}</h4>
+                        <p className="text-[11px] text-cyan-400 font-medium flex items-center gap-1 mt-0.5">
+                          <Clock className="w-3 h-3" />
+                          {new Date(prog.dateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                          {prog.location && <span className="text-slate-400">({prog.location})</span>}
+                        </p>
+                      </div>
+                      {isSuperAdmin && (
+                        <button
+                          onClick={() => handleDeleteProgramme(prog.id)}
+                          className="text-slate-500 hover:text-rose-400 text-xs p-1"
+                          title="Remove Activity"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-slate-300 leading-relaxed">{prog.description}</p>
+
+                    {/* Media Embedding (Photos / Whitelisted YouTube & Instagram) */}
+                    {prog.mediaType === 'IMAGE' && prog.photoUrl && (
+                      <div className="rounded-xl overflow-hidden border border-slate-800 bg-slate-950 mt-2">
+                        <img src={prog.photoUrl} alt={prog.title} className="w-full max-h-56 object-cover" />
+                      </div>
+                    )}
+
+                    {prog.mediaType === 'YOUTUBE' && prog.embedUrl && (
+                      <div className="rounded-xl overflow-hidden border border-slate-800 bg-slate-950 mt-2 aspect-video">
+                        <iframe
+                          src={prog.embedUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                          title={prog.title}
+                          className="w-full h-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        ></iframe>
+                      </div>
+                    )}
+
+                    {prog.mediaType === 'INSTAGRAM' && prog.embedUrl && (
+                      <div className="rounded-xl overflow-hidden border border-slate-800 bg-slate-950 p-2 text-center mt-2">
+                        <a
+                          href={prog.embedUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center space-x-1.5 text-xs text-pink-400 hover:text-pink-300 font-bold"
+                        >
+                          <Video className="w-4 h-4 text-pink-400" />
+                          <span>View Official Post on Instagram →</span>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -1730,6 +1888,111 @@ export default function HomePage() {
               <div className="pt-2 flex gap-2">
                 <button type="button" onClick={() => setShowAddHandover(false)} className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 font-medium">Cancel</button>
                 <button type="submit" className="flex-1 py-2 rounded-lg bg-cyan-600 text-white font-bold">Submit Request</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Add Programme (Super Admin Only) */}
+      {showAddProgramme && isSuperAdmin && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+          <div className="bg-slate-900 border border-cyan-500/30 w-full max-w-sm rounded-2xl p-4 shadow-2xl space-y-3">
+            <h3 className="text-sm font-bold text-slate-100 flex justify-between items-center">
+              <span>+ Add Festival Programme Activity</span>
+              <button onClick={() => setShowAddProgramme(false)} className="text-slate-400 text-xs">✕</button>
+            </h3>
+            <form onSubmit={handleAddProgramme} className="space-y-2.5 text-xs">
+              <div>
+                <label className="block text-slate-400 mb-1 font-medium">Activity Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Mahabhishekam & Evening Aarti"
+                  className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-cyan-500 font-semibold"
+                  value={programmeForm.title}
+                  onChange={(e) => setProgrammeForm({ ...programmeForm, title: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-medium">Date & Time</label>
+                <input
+                  type="datetime-local"
+                  className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-cyan-500 font-mono text-xs"
+                  value={programmeForm.dateTime}
+                  onChange={(e) => setProgrammeForm({ ...programmeForm, dateTime: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-medium">Location / Venue (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Main Pandal Hall"
+                  className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-cyan-500"
+                  value={programmeForm.location}
+                  onChange={(e) => setProgrammeForm({ ...programmeForm, location: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-medium">Description</label>
+                <textarea
+                  placeholder="Details about rituals, prasad distribution..."
+                  rows={2}
+                  className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-cyan-500"
+                  value={programmeForm.description}
+                  onChange={(e) => setProgrammeForm({ ...programmeForm, description: e.target.value })}
+                ></textarea>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-medium">Media Type</label>
+                <select
+                  className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-cyan-500 font-bold"
+                  value={programmeForm.mediaType}
+                  onChange={(e) => setProgrammeForm({ ...programmeForm, mediaType: e.target.value as any })}
+                >
+                  <option value="IMAGE">Direct Photo URL (Gallery / Camera)</option>
+                  <option value="YOUTUBE">YouTube Video Link (Whitelisted)</option>
+                  <option value="INSTAGRAM">Instagram Post / Reel Link (Whitelisted)</option>
+                </select>
+              </div>
+
+              {programmeForm.mediaType === 'IMAGE' && (
+                <div>
+                  <label className="block text-slate-400 mb-1 font-medium">Photo URL / Upload</label>
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-cyan-500 font-mono text-[11px]"
+                    value={programmeForm.photoUrl}
+                    onChange={(e) => setProgrammeForm({ ...programmeForm, photoUrl: e.target.value })}
+                  />
+                </div>
+              )}
+
+              {(programmeForm.mediaType === 'YOUTUBE' || programmeForm.mediaType === 'INSTAGRAM') && (
+                <div>
+                  <label className="block text-slate-400 mb-1 font-medium">
+                    Whitelisted {programmeForm.mediaType} Link
+                  </label>
+                  <input
+                    type="url"
+                    placeholder={programmeForm.mediaType === 'YOUTUBE' ? 'https://youtube.com/watch?v=...' : 'https://instagram.com/reel/...'}
+                    className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-cyan-500 font-mono text-[11px]"
+                    value={programmeForm.embedUrl}
+                    onChange={(e) => setProgrammeForm({ ...programmeForm, embedUrl: e.target.value })}
+                  />
+                  <p className="text-[9px] text-slate-500 mt-0.5">Only official youtube.com & instagram.com links allowed.</p>
+                </div>
+              )}
+
+              <div className="pt-2 flex gap-2">
+                <button type="button" onClick={() => setShowAddProgramme(false)} className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 font-medium">Cancel</button>
+                <button type="submit" className="flex-1 py-2 rounded-lg bg-cyan-600 text-white font-bold">Publish Activity</button>
               </div>
             </form>
           </div>
