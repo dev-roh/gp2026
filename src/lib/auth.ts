@@ -1,6 +1,6 @@
 import NextAuth, { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
-import { getUserRole } from '@/lib/db';
+import { getUserRole, registerOrUpdateUser } from '@/lib/db';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -10,7 +10,13 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user, trigger, session }) {
+    async signIn({ user }) {
+      if (user?.email && user?.name) {
+        registerOrUpdateUser(user.name, user.email, user.image || undefined);
+      }
+      return true;
+    },
+    async jwt({ token, user }) {
       if (token?.email) {
         token.role = getUserRole(token.email);
       }

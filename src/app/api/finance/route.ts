@@ -4,19 +4,27 @@ import { authOptions } from '@/lib/auth';
 import { getDb, saveDb, getUserRole } from '@/lib/db';
 
 export async function GET(req: Request) {
+  const session = await getServerSession(authOptions);
+  const userEmail = session?.user?.email;
+  const userRole = getUserRole(userEmail);
+
+  if (!userEmail) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const format = searchParams.get('format');
   const db = getDb();
 
   if (format === 'csv') {
-    let csv = 'Type,ID,Date,Name/Title,Area/Category,Amount,PaymentMode/OutofPocket,Collector/PaidBy,Notes/Status\n';
+    let csv = 'Type,ID,Date,Name/Title,Area/Category,Amount,PaymentMode/OutofPocket,Collector/PaidBy,Status,Notes\n';
     
     db.contributions.forEach(c => {
-      csv += `Contribution,"${c.id}","${c.date}","${c.memberName}","${c.memberArea}",${c.amount},"${c.paymentMode}","${c.collectorName}","Receipt: ${c.receiptNo}"\n`;
+      csv += `Contribution,"${c.id}","${c.date}","${c.memberName}","${c.memberArea}",${c.amount},"${c.paymentMode}","${c.collectorName}","${c.status}","Receipt: ${c.receiptNo}"\n`;
     });
 
     db.expenses.forEach(e => {
-      csv += `Expense,"${e.id}","${e.date}","${e.title}","${e.category}",${e.amount},"${e.isOutofPocket ? 'Out of Pocket' : 'Direct'}","${e.paidByName}","${e.isReimbursed ? 'Reimbursed' : 'Pending Reimbursement'}"\n`;
+      csv += `Expense,"${e.id}","${e.date}","${e.title}","${e.category}",${e.amount},"${e.isOutofPocket ? 'Out of Pocket' : 'Direct'}","${e.paidByName}","${e.isReimbursed ? 'Reimbursed' : 'Pending Reimbursement'}","N/A"\n`;
     });
 
     return new NextResponse(csv, {
@@ -27,16 +35,15 @@ export async function GET(req: Request) {
     });
   }
 
-  // Calculate Totals
-  const totalCollected = db.contributions.reduce((acc, curr) => acc + curr.amount, 0);
+  // Filter approved contributions for Treasury Vaults
+  const approvedContributions = db.contributions.filter(c => c.status === 'APPROVED');
+  const totalCollected = approvedContributions.reduce((acc, curr) => acc + curr.amount, 0);
   const totalSpent = db.expenses.reduce((acc, curr) => acc + curr.amount, 0);
   
-  // Pending collector cash waiting handover
   const pendingHandovers = db.handovers
     .filter(h => h.status === 'PENDING')
     .reduce((acc, curr) => acc + curr.amount, 0);
 
-  // Out of pocket balances owed to individuals
   const pendingReimbursements = db.expenses
     .filter(e => e.isOutofPocket && !e.isReimbursed)
     .reduce((acc, curr) => acc + curr.amount, 0);
@@ -45,28 +52,38 @@ export async function GET(req: Request) {
   const collectorBalances = db.users
     .filter(u => u.role === 'COLLECTOR' || u.role === 'TREASURER' || u.role === 'SUPER_ADMIN')
     .map(collector => {
-      const totalCashCollected = db.contributions
-        .filter(c => c.collectorId === collector.id && c.paymentMode === 'CASH')
+      const totalCashCollected = approvedContributions
+        .filter(c => c.collectorId === collector.email && c.paymentMode === 'CASH')
         .reduce((sum, c) => sum + c.amount, 0);
       
       const totalApprovedHandovers = db.handovers
-        .filter(h => h.collectorId === collector.id && h.status === 'APPROVED')
+        .filter(h => h.collectorId === collector.email && h.status === 'APPROVED')
         .reduce((sum, h) => sum + h.amount, 0);
       
       const totalPendingHandovers = db.handovers
-        .filter(h => h.collectorId === collector.id && h.status === 'PENDING')
+        .filter(h => h.collectorId === collector.email && h.status === 'PENDING')
         .reduce((sum, h) => sum + h.amount, 0);
 
       const cashInHand = totalCashCollected - totalApprovedHandovers;
       
       return {
         collectorId: collector.id,
+        collectorEmail: collector.email,
         collectorName: collector.name,
         collectorArea: collector.area || 'General',
         cashInHand,
         pendingHandoverAmount: totalPendingHandovers
       };
     });
+
+  // User-specific Notifications
+  const myNotifications = (db.notifications || []).filter(n => n.recipientEmail.toLowerCase() === userEmail.toLowerCase());
+
+  // Pending Contributions requiring approval by THIS user
+  const pendingApprovalsForMe = db.contributions.filter(c => 
+    (c.status === 'PENDING_COLLECTOR_APPROVAL' && c.approverEmail?.toLowerCase() === userEmail.toLowerCase()) ||
+    (c.status === 'PENDING_SUPER_ADMIN_APPROVAL' && userRole === 'SUPER_ADMIN')
+  );
 
   return NextResponse.json({
     settings: db.settings,
@@ -80,6 +97,8 @@ export async function GET(req: Request) {
     },
     collectorBalances,
     latestContributions: db.contributions.slice().reverse(),
+    pendingApprovalsForMe,
+    notifications: myNotifications,
     latestExpenses: db.expenses.slice().reverse(),
     handovers: db.handovers.slice().reverse()
   });
@@ -88,29 +107,101 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    const userRole = getUserRole(session?.user?.email);
+    const userEmail = session?.user?.email;
+    const userRole = getUserRole(userEmail);
+
+    if (!userEmail) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     const body = await req.json();
     const db = getDb();
     const { type, data } = body;
 
-    if (userRole === 'VIEW_ONLY') {
-      return NextResponse.json({ error: 'Forbidden. VIEW_ONLY users cannot perform mutations.' }, { status: 403 });
-    }
+    // SELF CONTRIBUTION / RECORD CONTRIBUTION WORKFLOW
+    if (type === 'ADD_SELF_CONTRIBUTION' || type === 'ADD_CONTRIBUTION') {
+      const isSelf = type === 'ADD_SELF_CONTRIBUTION';
+      let status: 'APPROVED' | 'PENDING_COLLECTOR_APPROVAL' | 'PENDING_SUPER_ADMIN_APPROVAL' = 'APPROVED';
+      let approverEmail = data.collectorId;
 
-    if (type === 'ADD_CONTRIBUTION') {
-      if (userRole === 'MEMBER') {
-        return NextResponse.json({ error: 'Forbidden. Members cannot record collections.' }, { status: 403 });
+      if (isSelf) {
+        if (userRole === 'VIEW_ONLY' || userRole === 'MEMBER') {
+          status = 'PENDING_COLLECTOR_APPROVAL';
+        } else if (userRole === 'COLLECTOR' || userRole === 'TREASURER') {
+          status = 'PENDING_SUPER_ADMIN_APPROVAL';
+          approverEmail = 'luhurenbaiclub@gmail.com';
+        } else if (userRole === 'SUPER_ADMIN') {
+          status = 'APPROVED';
+        }
       }
+
       const newContribution = {
         id: `cnt-${Date.now()}`,
         receiptNo: `REC-2026-${Math.floor(1000 + Math.random() * 9000)}`,
         date: new Date().toISOString(),
+        status,
+        approverEmail,
+        isSelfContribution: isSelf,
         ...data
       };
+
       db.contributions.push(newContribution);
+
+      // Create Notification if approval required
+      if (status !== 'APPROVED') {
+        db.notifications.push({
+          id: `notif-${Date.now()}`,
+          recipientEmail: approverEmail,
+          title: 'Contribution Approval Required 🔔',
+          message: `${data.memberName} (${data.memberArea}) recorded a self-contribution of ₹${data.amount} waiting your verification.`,
+          type: 'CONTRIBUTION_APPROVAL_REQUIRED',
+          targetId: newContribution.id,
+          isRead: false,
+          date: new Date().toISOString()
+        });
+      }
+
       saveDb(db);
-      return NextResponse.json({ success: true, item: newContribution });
+      return NextResponse.json({ success: true, item: newContribution, status });
+    }
+
+    // APPROVE / REJECT SELF CONTRIBUTION
+    if (type === 'DECIDE_CONTRIBUTION_APPROVAL') {
+      const { contributionId, decision } = data; // decision: 'APPROVE' | 'REJECT'
+      const index = db.contributions.findIndex(c => c.id === contributionId);
+
+      if (index === -1) {
+        return NextResponse.json({ error: 'Contribution not found' }, { status: 404 });
+      }
+
+      const contrib = db.contributions[index];
+
+      // Validate permission
+      const isSuperAdminApprover = contrib.status === 'PENDING_SUPER_ADMIN_APPROVAL' && userRole === 'SUPER_ADMIN';
+      const isCollectorApprover = contrib.status === 'PENDING_COLLECTOR_APPROVAL' && contrib.approverEmail?.toLowerCase() === userEmail.toLowerCase();
+
+      if (!isSuperAdminApprover && !isCollectorApprover) {
+        return NextResponse.json({ error: 'Forbidden. You are not authorized to decide this approval.' }, { status: 403 });
+      }
+
+      if (decision === 'APPROVE') {
+        db.contributions[index].status = 'APPROVED';
+        db.notifications.push({
+          id: `notif-${Date.now()}`,
+          recipientEmail: contrib.memberId || userEmail,
+          title: 'Contribution Verified & Approved! ✅',
+          message: `Your contribution of ₹${contrib.amount} has been verified and added to the official treasury.`,
+          type: 'CONTRIBUTION_APPROVED',
+          targetId: contrib.id,
+          isRead: false,
+          date: new Date().toISOString()
+        });
+      } else {
+        db.contributions[index].status = 'REJECTED';
+      }
+
+      saveDb(db);
+      return NextResponse.json({ success: true, item: db.contributions[index] });
     }
 
     if (type === 'ADD_EXPENSE') {
@@ -126,9 +217,6 @@ export async function POST(req: Request) {
     }
 
     if (type === 'REQUEST_HANDOVER') {
-      if (userRole === 'MEMBER') {
-        return NextResponse.json({ error: 'Forbidden. Members cannot request cash handovers.' }, { status: 403 });
-      }
       const newHandover = {
         id: `hnd-${Date.now()}`,
         status: 'PENDING',
@@ -147,7 +235,7 @@ export async function POST(req: Request) {
       const index = db.handovers.findIndex(h => h.id === data.handoverId);
       if (index !== -1) {
         db.handovers[index].status = 'APPROVED';
-        db.handovers[index].treasurerId = data.treasurerId || 'usr-1';
+        db.handovers[index].treasurerId = userEmail;
         db.handovers[index].treasurerName = session?.user?.name || 'Treasurer';
         saveDb(db);
         return NextResponse.json({ success: true, item: db.handovers[index] });

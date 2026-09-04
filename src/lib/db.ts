@@ -43,6 +43,20 @@ export interface Contribution {
   memberArea: string;
   collectorId: string;
   collectorName: string;
+  status: 'APPROVED' | 'PENDING_COLLECTOR_APPROVAL' | 'PENDING_SUPER_ADMIN_APPROVAL' | 'REJECTED';
+  approverEmail?: string;
+  isSelfContribution?: boolean;
+}
+
+export interface NotificationItem {
+  id: string;
+  recipientEmail: string;
+  title: string;
+  message: string;
+  type: 'CONTRIBUTION_APPROVAL_REQUIRED' | 'CONTRIBUTION_APPROVED' | 'HANDOVER_APPROVAL_REQUIRED';
+  targetId: string;
+  isRead: boolean;
+  date: string;
 }
 
 export interface Handover {
@@ -76,6 +90,7 @@ export interface DatabaseSchema {
   users: User[];
   roleAssignments: Record<string, UserRoleAssignment>;
   contributions: Contribution[];
+  notifications: NotificationItem[];
   handovers: Handover[];
   expenses: Expense[];
 }
@@ -109,9 +124,10 @@ const initialData: DatabaseSchema = {
     'collector1@gp2026.com': { email: 'collector1@gp2026.com', role: 'COLLECTOR', assignedBy: SUPER_ADMIN_EMAIL, updatedAt: new Date().toISOString() }
   },
   contributions: [
-    { id: 'cnt-1', amount: 5000, paymentMode: 'CASH', receiptNo: 'REC-2026-001', note: 'Full annual chanda', date: new Date().toISOString(), memberId: 'usr-4', memberName: 'Priya Joshi', memberArea: 'Sector 1 / Wing A', collectorId: 'usr-2', collectorName: 'Amit Patel' },
-    { id: 'cnt-2', amount: 3500, paymentMode: 'UPI', receiptNo: 'REC-2026-002', note: 'Partial payment', date: new Date().toISOString(), memberId: 'usr-5', memberName: 'Vikram Singh', memberArea: 'Sector 2 / Wing B', collectorId: 'usr-1', collectorName: 'Rajesh Sharma' }
+    { id: 'cnt-1', amount: 5000, paymentMode: 'CASH', receiptNo: 'REC-2026-001', note: 'Full annual chanda', date: new Date().toISOString(), memberId: 'usr-4', memberName: 'Priya Joshi', memberArea: 'Sector 1 / Wing A', collectorId: 'usr-2', collectorName: 'Amit Patel', status: 'APPROVED' },
+    { id: 'cnt-2', amount: 3500, paymentMode: 'UPI', receiptNo: 'REC-2026-002', note: 'Partial payment', date: new Date().toISOString(), memberId: 'usr-5', memberName: 'Vikram Singh', memberArea: 'Sector 2 / Wing B', collectorId: 'usr-1', collectorName: 'Rajesh Sharma', status: 'APPROVED' }
   ],
+  notifications: [],
   handovers: [
     { id: 'hnd-1', amount: 5000, status: 'PENDING', notes: 'Cash collected from Sector 1 / Wing A', date: new Date().toISOString(), collectorId: 'usr-2', collectorName: 'Amit Patel', collectorArea: 'Sector 1 / Wing A' }
   ],
@@ -132,12 +148,9 @@ export function getDb(): DatabaseSchema {
   try {
     const raw = fs.readFileSync(dbPath, 'utf8');
     const parsed = JSON.parse(raw);
-    if (!parsed.settings) {
-      parsed.settings = defaultSettings;
-    }
-    if (!parsed.roleAssignments) {
-      parsed.roleAssignments = initialData.roleAssignments;
-    }
+    if (!parsed.settings) parsed.settings = defaultSettings;
+    if (!parsed.roleAssignments) parsed.roleAssignments = initialData.roleAssignments;
+    if (!parsed.notifications) parsed.notifications = [];
     return parsed;
   } catch {
     return initialData;
@@ -162,4 +175,32 @@ export function getUserRole(email: string | null | undefined): 'SUPER_ADMIN' | '
   }
 
   return 'VIEW_ONLY';
+}
+
+export function registerOrUpdateUser(name: string, email: string, image?: string): User {
+  const db = getDb();
+  const normalizedEmail = email.toLowerCase();
+  let user = db.users.find(u => u.email.toLowerCase() === normalizedEmail);
+
+  if (!user) {
+    const role = getUserRole(normalizedEmail);
+    user = {
+      id: `usr-${Date.now()}`,
+      name,
+      email: normalizedEmail,
+      image,
+      role,
+      area: 'General Area',
+      createdAt: new Date().toISOString()
+    };
+    db.users.push(user);
+    saveDb(db);
+  } else {
+    let updated = false;
+    if (name && user.name !== name) { user.name = name; updated = true; }
+    if (image && user.image !== image) { user.image = image; updated = true; }
+    if (updated) saveDb(db);
+  }
+
+  return user;
 }

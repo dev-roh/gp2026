@@ -16,9 +16,12 @@ import {
   Palette,
   Image as ImageIcon,
   Sliders,
-  CheckCircle2
+  CheckCircle2,
+  Bell,
+  UserCheck,
+  Users
 } from 'lucide-react';
-import { AppSettings } from '@/lib/db';
+import { AppSettings, User as DbUser } from '@/lib/db';
 
 interface FinanceSummary {
   totalCollected: number;
@@ -49,6 +52,7 @@ interface Contribution {
   memberArea: string;
   collectorId: string;
   collectorName: string;
+  status: 'APPROVED' | 'PENDING_COLLECTOR_APPROVAL' | 'PENDING_SUPER_ADMIN_APPROVAL' | 'REJECTED';
 }
 
 interface Handover {
@@ -85,15 +89,19 @@ interface RoleAssignment {
 
 export default function HomePage() {
   const { data: session, status } = useSession();
-  const [activeTab, setActiveTab] = useState<'overview' | 'collectors' | 'contributions' | 'expenses' | 'admin' | 'branding'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'collectors' | 'contributions' | 'expenses' | 'approvals' | 'admin' | 'branding'>('overview');
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [collectorBalances, setCollectorBalances] = useState<CollectorBalance[]>([]);
   const [contributions, setContributions] = useState<Contribution[]>([]);
+  const [pendingApprovalsForMe, setPendingApprovalsForMe] = useState<Contribution[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [handovers, setHandovers] = useState<Handover[]>([]);
 
-  // Settings & Branding State
+  // Collectors and Treasurers List for tagging
+  const [collectorsList, setCollectorsList] = useState<DbUser[]>([]);
+
+  // Settings State
   const [settings, setSettings] = useState<AppSettings>({
     appTitle: 'GP 2026 Finance',
     subTitle: 'gp2026.luhurachati.com',
@@ -108,14 +116,15 @@ export default function HomePage() {
 
   const [settingsMsg, setSettingsMsg] = useState('');
 
-  // Super Admin Role Management state
+  // Super Admin Role State
   const [roleAssignments, setRoleAssignments] = useState<RoleAssignment[]>([]);
   const [targetEmail, setTargetEmail] = useState('');
   const [selectedRole, setSelectedRole] = useState<'SUPER_ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER' | 'VIEW_ONLY'>('COLLECTOR');
   const [roleMsg, setRoleMsg] = useState('');
 
-  // Modals & Selected Receipt / Handover Voucher
+  // Modals & Receipts
   const [showAddContribution, setShowAddContribution] = useState(false);
+  const [showSelfContribution, setShowSelfContribution] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showAddHandover, setShowAddHandover] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Contribution | null>(null);
@@ -127,6 +136,14 @@ export default function HomePage() {
     memberArea: '',
     amount: '',
     paymentMode: 'CASH' as 'CASH' | 'UPI' | 'BANK_TRANSFER',
+    note: ''
+  });
+
+  const [selfContribForm, setSelfContribForm] = useState({
+    amount: '',
+    paymentMode: 'UPI' as 'CASH' | 'UPI' | 'BANK_TRANSFER',
+    memberArea: '',
+    taggedCollectorEmail: '',
     note: ''
   });
 
@@ -143,6 +160,21 @@ export default function HomePage() {
     notes: ''
   });
 
+  const fetchUsersDirectory = async () => {
+    try {
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        const data = await res.json();
+        setCollectorsList(data.collectorsAndTreasurers || []);
+        if (data.collectorsAndTreasurers?.length > 0) {
+          setSelfContribForm(prev => ({ ...prev, taggedCollectorEmail: data.collectorsAndTreasurers[0].email }));
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const fetchFinanceData = async () => {
     try {
       setLoading(true);
@@ -152,6 +184,7 @@ export default function HomePage() {
       setSummary(data.summary);
       setCollectorBalances(data.collectorBalances);
       setContributions(data.latestContributions);
+      setPendingApprovalsForMe(data.pendingApprovalsForMe || []);
       setExpenses(data.latestExpenses);
       setHandovers(data.handovers);
     } catch (err) {
@@ -176,11 +209,66 @@ export default function HomePage() {
   useEffect(() => {
     if (session) {
       fetchFinanceData();
+      fetchUsersDirectory();
       if ((session.user as any)?.role === 'SUPER_ADMIN') {
         fetchRoleAssignments();
       }
     }
   }, [session]);
+
+  const handleSelfContributionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selfContribForm.amount) return;
+
+    const selectedCollector = collectorsList.find(c => c.email.toLowerCase() === selfContribForm.taggedCollectorEmail.toLowerCase());
+
+    const res = await fetch('/api/finance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'ADD_SELF_CONTRIBUTION',
+        data: {
+          memberName: session?.user?.name || 'Member',
+          memberArea: selfContribForm.memberArea || 'General Area',
+          amount: parseFloat(selfContribForm.amount),
+          paymentMode: selfContribForm.paymentMode,
+          collectorId: selectedCollector?.email || 'luhurenbaiclub@gmail.com',
+          collectorName: selectedCollector?.name || 'Super Admin',
+          note: selfContribForm.note,
+          memberId: session?.user?.email
+        }
+      })
+    });
+
+    const result = await res.json();
+    if (res.ok) {
+      setShowSelfContribution(false);
+      setSelfContribForm({ amount: '', paymentMode: 'UPI', memberArea: '', taggedCollectorEmail: '', note: '' });
+      fetchFinanceData();
+      alert(result.status === 'APPROVED' 
+        ? 'Contribution recorded and approved!' 
+        : 'Contribution submitted! Sent for verification approval.');
+    } else {
+      alert(result.error || 'Failed to submit contribution');
+    }
+  };
+
+  const handleDecideContribution = async (contributionId: string, decision: 'APPROVE' | 'REJECT') => {
+    const res = await fetch('/api/finance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'DECIDE_CONTRIBUTION_APPROVAL',
+        data: { contributionId, decision }
+      })
+    });
+    const result = await res.json();
+    if (res.ok) {
+      fetchFinanceData();
+    } else {
+      alert(result.error || 'Failed to decide approval');
+    }
+  };
 
   const handleUpdateSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -468,7 +556,7 @@ export default function HomePage() {
 
   return (
     <div className="space-y-4">
-      {/* Authenticated User Header Banner */}
+      {/* Authenticated User Header Banner with Notification Center */}
       <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs">
         <div className="flex items-center space-x-2">
           {session.user?.image ? (
@@ -485,24 +573,47 @@ export default function HomePage() {
             </span>
           </div>
         </div>
-        <button 
-          onClick={() => signOut()}
-          className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-[11px] font-medium transition"
-        >
-          <LogOut className="w-3.5 h-3.5" />
-          <span>Sign Out</span>
-        </button>
+
+        <div className="flex items-center space-x-2">
+          {/* Pending Approvals Bell Icon */}
+          {pendingApprovalsForMe.length > 0 && (
+            <button 
+              onClick={() => setActiveTab('approvals')}
+              className="relative p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 animate-pulse"
+              title="Pending Verification Approvals"
+            >
+              <Bell className="w-4 h-4" />
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-extrabold flex items-center justify-center">
+                {pendingApprovalsForMe.length}
+              </span>
+            </button>
+          )}
+
+          <button 
+            onClick={() => signOut()}
+            className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-[11px] font-medium transition"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sign Out</span>
+          </button>
+        </div>
       </div>
 
-      {/* VIEW_ONLY Warning Banner */}
-      {isViewOnly && (
-        <div className="bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl text-xs text-amber-300 flex items-center space-x-2">
-          <Lock className="w-4 h-4 flex-shrink-0 text-amber-400" />
-          <p className="text-[11px]">
-            You have <strong>VIEW_ONLY</strong> access. Contact Super Admin (<code className="text-amber-200 font-mono">luhurenbaiclub@gmail.com</code>) to request elevated role permissions.
-          </p>
+      {/* Self-Contribution Quick Action Banner for ALL Users */}
+      <div className="bg-gradient-to-r from-orange-950/60 to-amber-950/60 border border-orange-500/30 p-3 rounded-2xl flex items-center justify-between shadow-lg">
+        <div>
+          <h3 className="text-xs font-bold text-slate-100 flex items-center gap-1">
+            <PlusCircle className="w-4 h-4 text-orange-400" /> Pay / Record My Chanda
+          </h3>
+          <p className="text-[10px] text-slate-400">Contribute directly and tag a collector for instant verification</p>
         </div>
-      )}
+        <button 
+          onClick={() => setShowSelfContribution(true)}
+          className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-400 text-slate-950 font-extrabold text-xs shadow hover:from-orange-600 hover:to-amber-500 transition"
+        >
+          + Record My Contribution
+        </button>
+      </div>
 
       {/* Target Goal & Quick Actions Header */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
@@ -526,7 +637,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Action Buttons - Role Scoped & Label Customized */}
+        {/* Action Buttons - Role Scoped */}
         <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-800/80">
           {isCollector ? (
             <button 
@@ -576,6 +687,17 @@ export default function HomePage() {
         >
           Overview
         </button>
+
+        {pendingApprovalsForMe.length > 0 && (
+          <button 
+            onClick={() => setActiveTab('approvals')} 
+            className={`flex-1 py-2 px-3 rounded-lg text-center whitespace-nowrap transition flex items-center justify-center gap-1 ${activeTab === 'approvals' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-amber-400 hover:text-amber-200'}`}
+          >
+            <span>Approvals</span>
+            <span className="bg-amber-950 text-amber-200 text-[9px] px-1.5 py-0.2 rounded-full font-extrabold">{pendingApprovalsForMe.length}</span>
+          </button>
+        )}
+
         <button 
           onClick={() => setActiveTab('collectors')} 
           className={`flex-1 py-2 px-3 rounded-lg text-center whitespace-nowrap transition ${activeTab === 'collectors' ? `${theme.bg} text-white font-bold shadow` : 'text-slate-400 hover:text-slate-200'}`}
@@ -642,7 +764,7 @@ export default function HomePage() {
               <button onClick={() => setActiveTab('contributions')} className="text-orange-400 text-[11px] normal-case hover:underline">View All →</button>
             </h3>
             <div className="divide-y divide-slate-800">
-              {contributions.slice(0, 5).map((c) => (
+              {contributions.filter(c => c.status === 'APPROVED').slice(0, 5).map((c) => (
                 <div key={c.id} className="py-2 flex items-center justify-between text-xs">
                   <div>
                     <p className="font-semibold text-slate-200">{c.memberName} <span className="text-slate-400 font-normal">({c.memberArea})</span></p>
@@ -665,6 +787,54 @@ export default function HomePage() {
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT: Pending Approvals Queue */}
+      {activeTab === 'approvals' && (
+        <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-3 shadow-md space-y-3 text-xs">
+          <div className="flex items-center space-x-2">
+            <Bell className="w-4 h-4 text-amber-400" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-300">Pending Verification Approvals</h3>
+          </div>
+
+          {pendingApprovalsForMe.length === 0 ? (
+            <p className="text-slate-500 text-xs py-2">No pending approvals waiting your verification.</p>
+          ) : (
+            <div className="space-y-2.5">
+              {pendingApprovalsForMe.map((item) => (
+                <div key={item.id} className="bg-slate-850 p-3 rounded-xl border border-slate-800 space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-bold text-slate-200">{item.memberName}</p>
+                      <p className="text-[10px] text-slate-400">Area: {item.memberArea}</p>
+                      <p className="text-[10px] text-slate-400">Note: {item.note || 'N/A'}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-extrabold text-amber-400 text-sm">₹{item.amount.toLocaleString()}</p>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">{item.paymentMode}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <button 
+                      onClick={() => handleDecideContribution(item.id, 'APPROVE')}
+                      className="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow text-xs flex items-center justify-center space-x-1"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Verify & Approve</span>
+                    </button>
+                    <button 
+                      onClick={() => handleDecideContribution(item.id, 'REJECT')}
+                      className="flex-1 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -767,20 +937,27 @@ export default function HomePage() {
                     <span className="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">{c.memberArea}</span>
                   </div>
                   <p className="text-[10px] text-slate-400 mt-0.5">Receipt: <span className="text-slate-300 font-mono">{c.receiptNo}</span></p>
-                  <p className="text-[10px] text-slate-500">Collected by {c.collectorName}</p>
+                  <div className="flex gap-1.5 mt-1">
+                    <span className="text-[9px] text-slate-500">Collector: {c.collectorName}</span>
+                    <span className={`text-[9px] px-1.5 py-0.2 rounded font-medium ${c.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                      {c.status}
+                    </span>
+                  </div>
                 </div>
                 <div className="text-right flex items-center space-x-2">
                   <div>
                     <p className="font-bold text-emerald-400 text-sm">₹{c.amount.toLocaleString()}</p>
                     <span className="text-[9px] text-slate-400">{c.paymentMode}</span>
                   </div>
-                  <button 
-                    onClick={() => setSelectedReceipt(c)}
-                    className="p-1.5 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20"
-                    title="View Digital Receipt"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                  </button>
+                  {c.status === 'APPROVED' && (
+                    <button 
+                      onClick={() => setSelectedReceipt(c)}
+                      className="p-1.5 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20"
+                      title="View Digital Receipt"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -954,28 +1131,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="space-y-2 pt-1 border-t border-slate-800">
-              <p className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">Custom UI Button Labels</p>
-              <div>
-                <label className="block text-slate-400 mb-1">Collection Button Label</label>
-                <input 
-                  type="text" 
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-amber-500"
-                  value={settings.collectionButtonLabel}
-                  onChange={(e) => setSettings({ ...settings, collectionButtonLabel: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-slate-400 mb-1">Spend / Bill Button Label</label>
-                <input 
-                  type="text" 
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-amber-500"
-                  value={settings.spendButtonLabel}
-                  onChange={(e) => setSettings({ ...settings, spendButtonLabel: e.target.value })}
-                />
-              </div>
-            </div>
-
             <button type="submit" className="w-full py-2.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold transition shadow-lg">
               Save Branding & Label Customizations
             </button>
@@ -986,6 +1141,87 @@ export default function HomePage() {
               </p>
             )}
           </form>
+        </div>
+      )}
+
+      {/* MODAL: RECORD MY OWN CONTRIBUTION */}
+      {showSelfContribution && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+          <div className="bg-slate-900 border border-amber-500/30 w-full max-w-sm rounded-2xl p-4 shadow-2xl space-y-3">
+            <h3 className="text-sm font-bold text-slate-100 flex justify-between items-center">
+              <span>+ Record My Contribution</span>
+              <button onClick={() => setShowSelfContribution(false)} className="text-slate-400 text-xs">✕</button>
+            </h3>
+            <form onSubmit={handleSelfContributionSubmit} className="space-y-2.5 text-xs">
+              <div>
+                <label className="block text-slate-400 mb-1">Contribution Amount (₹)</label>
+                <input 
+                  type="number" 
+                  placeholder="5000"
+                  className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-orange-500 font-bold text-orange-400"
+                  value={selfContribForm.amount}
+                  onChange={(e) => setSelfContribForm({ ...selfContribForm, amount: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-slate-400 mb-1">Area / Wing</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Wing A"
+                    className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-orange-500"
+                    value={selfContribForm.memberArea}
+                    onChange={(e) => setSelfContribForm({ ...selfContribForm, memberArea: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1">Payment Mode</label>
+                  <select 
+                    className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-orange-500"
+                    value={selfContribForm.paymentMode}
+                    onChange={(e) => setSelfContribForm({ ...selfContribForm, paymentMode: e.target.value as any })}
+                  >
+                    <option value="UPI">UPI / QR Scan</option>
+                    <option value="CASH">Cash in hand</option>
+                    <option value="BANK_TRANSFER">Bank NetBanking</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1">Tag Collector / Treasurer to Verify</label>
+                <select 
+                  className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-orange-500 font-bold"
+                  value={selfContribForm.taggedCollectorEmail}
+                  onChange={(e) => setSelfContribForm({ ...selfContribForm, taggedCollectorEmail: e.target.value })}
+                  required
+                >
+                  {collectorsList.map((c) => (
+                    <option key={c.email} value={c.email}>
+                      {c.name} ({c.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1">Payment Ref / Transaction ID / Note</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. UPI Ref: 42398... or Cash handed to Amit"
+                  className="w-full bg-slate-850 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-orange-500"
+                  value={selfContribForm.note}
+                  onChange={(e) => setSelfContribForm({ ...selfContribForm, note: e.target.value })}
+                />
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button type="button" onClick={() => setShowSelfContribution(false)} className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 font-medium">Cancel</button>
+                <button type="submit" className="flex-1 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-amber-400 text-slate-950 font-bold">Submit Contribution</button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
