@@ -19,10 +19,11 @@
    - Immutable Super Admin root anchor for `luhurenbaiclub@gmail.com`.
    - Default **`VIEW_ONLY`** read-only role for 1st-time user logins.
    - Super Admin Role Console in [src/app/api/admin/roles/route.ts](file:///home/rohit/ganesh_puja_2026/src/app/api/admin/roles/route.ts).
-7. **Super Admin Branding & Customization Feature** *(Built via `feature/admin-customization-branding` branch)*:
-   - **Image Upload for App Logo**: Support for uploading custom logos rendered dynamically across the app header, sign-in prompt, and digital WhatsApp receipts.
-   - **Color Theme Selector**: Real-time visual theme selection (`Amber Orange`, `Emerald Green`, `Slate Blue`, `Purple Gold`).
-   - **Custom UI Button & Goal Labels**: Ability to customize collection buttons, spend buttons, handover buttons, app titles, and target amounts dynamically in [src/app/api/admin/settings/route.ts](file:///home/rohit/ganesh_puja_2026/src/app/api/admin/settings/route.ts).
+7. **Super Admin Branding & Customization Feature**:
+   - Image Upload for App Logo, visual color theme selector, and custom UI button labels.
+8. **Cash Handover Digital Voucher & Area Terminology Feature** *(Built via `feature/collector-handover-pdf-whatsapp` branch)*:
+   - **Global Area / Wing Terminology**: Updated terminology from "Flat No" to "Area / Wing" across member contributions, collector vaults, vouchers, and CSV audit reports.
+   - **Digital Cash Handover Voucher Modal**: Created an interactive digital voucher for cash handovers with 1-click **WhatsApp sharing** and approval tracking.
 
 ---
 
