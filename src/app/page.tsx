@@ -258,6 +258,22 @@ function ProgrammeMediaCard({ prog }: { prog: ProgrammeItem }) {
 
 export default function HomePage() {
   const { data: session, status } = useSession();
+
+  // Central SSO Token Interceptor Effect
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const ssoToken = urlParams.get('sso_token');
+      if (ssoToken) {
+        signIn('sso-gateway', { token: ssoToken, redirect: false }).then((res) => {
+          // Clean sso_token param from browser URL history cleanly
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, newUrl);
+        });
+      }
+    }
+  }, []);
+
   const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'programmes' | 'collectors' | 'contributions' | 'expenses' | 'reimbursements' | 'approvals' | 'admin' | 'branding'>('overview');
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
@@ -962,18 +978,18 @@ export default function HomePage() {
         <div className="w-full max-w-xs bg-white border border-amber-200/80 rounded-3xl p-6 shadow-xl space-y-4">
           <div className="flex items-center justify-center space-x-2 text-emerald-700 text-xs font-semibold">
             <Lock className="w-4 h-4 text-emerald-600" />
-            <span>Google OAuth 2.0 Protection</span>
+            <span>Central SSO Identity Gateway</span>
           </div>
 
-          <button
-            onClick={() => signIn('google')}
+          <a
+            href="https://www.luhurachati.com"
             className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-xs shadow-md flex items-center justify-center space-x-2 transition transform active:scale-95"
           >
             <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
               <path d="M12.24 10.285V13.4h6.887c-.58 3.424-3.57 5.767-6.887 5.767-4.12 0-7.464-3.344-7.464-7.464S8.12 4.238 12.24 4.238c1.86 0 3.55.674 4.86 1.785l2.454-2.453C17.754 1.83 15.16.8 12.24.8 6.03.8 1 5.83 1 12.04s5.03 11.24 11.24 11.24c6.49 0 10.8-4.56 10.8-10.98 0-.74-.08-1.46-.2-2.015H12.24z"/>
             </svg>
-            <span>Sign in with Google Account</span>
-          </button>
+            <span>Sign in via Luhurachati Portal</span>
+          </a>
 
           <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-500 flex justify-center space-x-3 font-medium">
             <a href="/privacy" className="hover:text-orange-600 underline">Privacy Policy</a>
