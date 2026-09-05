@@ -22,6 +22,8 @@ export interface User {
   role: 'SUPER_ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER' | 'VIEW_ONLY';
   area?: string;
   phone?: string;
+  isManual?: boolean;
+  linkedMemberIds?: string[];
   createdAt: string;
 }
 
@@ -347,11 +349,49 @@ export async function registerOrUpdateUserAsync(name: string, email: string, ima
     db.users.push(user);
 
     // Auto-link any historical contributions where memberName matches exact registered name
+    let matchedContributionsCount = 0;
+    let matchedArea = 'General Area';
     db.contributions.forEach(c => {
       if (c.memberName && c.memberName.trim().toLowerCase() === name.trim().toLowerCase()) {
         c.memberId = user!.id;
+        matchedContributionsCount++;
+        if (c.memberArea && c.memberArea !== 'General Area') {
+          matchedArea = c.memberArea;
+        }
       }
     });
+
+    if (matchedArea !== 'General Area') {
+      user.area = matchedArea;
+    }
+
+    // If user is new with VIEW_ONLY role and has existing collections or matching name, auto request MEMBER role
+    if (role === 'VIEW_ONLY' && matchedContributionsCount > 0) {
+      const existingReq = db.membershipRequests.find(r => r.userEmail.toLowerCase() === normalizedEmail && r.status === 'PENDING');
+      if (!existingReq) {
+        db.membershipRequests.push({
+          id: `req-${Date.now()}`,
+          userName: name,
+          userEmail: normalizedEmail,
+          userArea: user.area,
+          requestedRole: 'MEMBER',
+          status: 'PENDING',
+          createdAt: new Date().toISOString()
+        });
+
+        // Notify Super Admin
+        db.notifications.push({
+          id: `notif-${Date.now()}`,
+          recipientEmail: SUPER_ADMIN_EMAIL,
+          title: 'Membership Auto-Request',
+          message: `${name} (${normalizedEmail}) matched ${matchedContributionsCount} collection record(s). MEMBER approval requested.`,
+          type: 'MEMBERSHIP_REQUEST',
+          targetId: normalizedEmail,
+          isRead: false,
+          date: new Date().toISOString()
+        });
+      }
+    }
 
     await saveDbAsync(db);
   } else {
@@ -392,11 +432,48 @@ export function registerOrUpdateUser(name: string, email: string, image?: string
     db.users.push(user);
 
     // Auto-link any historical contributions where memberName matches exact registered name
+    let matchedContributionsCount = 0;
+    let matchedArea = 'General Area';
     db.contributions.forEach(c => {
       if (c.memberName && c.memberName.trim().toLowerCase() === name.trim().toLowerCase()) {
         c.memberId = user!.id;
+        matchedContributionsCount++;
+        if (c.memberArea && c.memberArea !== 'General Area') {
+          matchedArea = c.memberArea;
+        }
       }
     });
+
+    if (matchedArea !== 'General Area') {
+      user.area = matchedArea;
+    }
+
+    // If user is new with VIEW_ONLY role and has existing collections, auto request MEMBER role
+    if (role === 'VIEW_ONLY' && matchedContributionsCount > 0) {
+      const existingReq = db.membershipRequests.find(r => r.userEmail.toLowerCase() === normalizedEmail && r.status === 'PENDING');
+      if (!existingReq) {
+        db.membershipRequests.push({
+          id: `req-${Date.now()}`,
+          userName: name,
+          userEmail: normalizedEmail,
+          userArea: user.area,
+          requestedRole: 'MEMBER',
+          status: 'PENDING',
+          createdAt: new Date().toISOString()
+        });
+
+        db.notifications.push({
+          id: `notif-${Date.now()}`,
+          recipientEmail: SUPER_ADMIN_EMAIL,
+          title: 'Membership Auto-Request',
+          message: `${name} (${normalizedEmail}) matched ${matchedContributionsCount} collection record(s). MEMBER approval requested.`,
+          type: 'MEMBERSHIP_REQUEST',
+          targetId: normalizedEmail,
+          isRead: false,
+          date: new Date().toISOString()
+        });
+      }
+    }
 
     saveDb(db);
   } else {

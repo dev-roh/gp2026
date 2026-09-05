@@ -244,7 +244,7 @@ function ProgrammeMediaCard({ prog }: { prog: ProgrammeItem }) {
 
 export default function HomePage() {
   const { data: session, status } = useSession();
-  const [activeTab, setActiveTab] = useState<'overview' | 'programmes' | 'collectors' | 'contributions' | 'expenses' | 'reimbursements' | 'approvals' | 'admin' | 'branding'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'programmes' | 'collectors' | 'contributions' | 'expenses' | 'reimbursements' | 'approvals' | 'admin' | 'branding'>('overview');
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [collectorBalances, setCollectorBalances] = useState<CollectorBalance[]>([]);
@@ -351,6 +351,74 @@ export default function HomePage() {
   const [membershipReqMsg, setMembershipReqMsg] = useState('');
   const [registeredUsers, setRegisteredUsers] = useState<DbUser[]>([]);
 
+  // Members Directory & Smart User Management States
+  const [membersDirectory, setMembersDirectory] = useState<Array<{ id: string; name: string; area: string; role: string; email?: string; image?: string; isRegistered: boolean; totalContributed: number; countContributed: number }>>([]);
+  const [smartSuggestions, setSmartSuggestions] = useState<Array<{ collectionName: string; collectionArea: string; collectionCount: number; suggestedUserEmail: string; suggestedUserName: string; confidence: string }>>([]);
+  const [addMemberForm, setAddMemberForm] = useState({ name: '', area: '', phone: '', email: '', role: 'MEMBER' as 'MEMBER' | 'COLLECTOR' | 'TREASURER' });
+  const [addMemberMsg, setAddMemberMsg] = useState('');
+  const [searchMemberQuery, setSearchMemberQuery] = useState('');
+
+  const fetchMembersDirectory = async () => {
+    try {
+      const res = await fetch('/api/admin/users');
+      if (res.ok) {
+        const data = await res.json();
+        setMembersDirectory(data.members || []);
+        if (data.smartSuggestions) setSmartSuggestions(data.smartSuggestions);
+      }
+    } catch (err) {
+      console.error('Error fetching members directory:', err);
+    }
+  };
+
+  const handleAddMemberSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addMemberForm.name) return;
+
+    setAddMemberMsg('Adding member...');
+    const res = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'ADD_MEMBER',
+        ...addMemberForm
+      })
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      setAddMemberMsg(`✅ ${data.message}`);
+      setAddMemberForm({ name: '', area: '', phone: '', email: '', role: 'MEMBER' });
+      fetchMembersDirectory();
+      fetchFinanceData();
+    } else {
+      setAddMemberMsg(`Error: ${data.error || 'Failed to add member'}`);
+    }
+  };
+
+  const handleMergeCollectionUser = async (collectionName: string, targetUserEmail: string) => {
+    if (!confirm(`Merge all collection records of "${collectionName}" under user account ${targetUserEmail}?`)) return;
+
+    const res = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'MERGE_COLLECTION_USER',
+        collectionName,
+        targetUserEmail
+      })
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      alert(`✅ ${data.message}`);
+      fetchMembersDirectory();
+      fetchFinanceData();
+    } else {
+      alert(`Error: ${data.error || 'Failed to merge user'}`);
+    }
+  };
+
   const fetchFinanceData = async () => {
     try {
       setLoading(true);
@@ -367,6 +435,7 @@ export default function HomePage() {
       setProgrammes(data.programmes || []);
       setMembershipRequests(data.membershipRequests || []);
       setRegisteredUsers(data.users || []);
+      fetchMembersDirectory();
     } catch (err) {
       console.error(err);
     } finally {
@@ -1027,6 +1096,15 @@ export default function HomePage() {
         >
           Overview
         </button>
+        {isMember && (
+          <button 
+            onClick={() => setActiveTab('members')} 
+            className={`flex-1 py-2 px-3.5 rounded-xl text-center whitespace-nowrap transition flex items-center justify-center space-x-1 ${activeTab === 'members' ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Members Directory</span>
+          </button>
+        )}
         <button 
           onClick={() => setActiveTab('programmes')} 
           className={`flex-1 py-2 px-3.5 rounded-xl text-center whitespace-nowrap transition flex items-center justify-center space-x-1 ${activeTab === 'programmes' ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
@@ -1417,6 +1495,182 @@ export default function HomePage() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT: Members Directory & Smart User Management */}
+      {activeTab === 'members' && (
+        <div className="space-y-4">
+          {/* Super Admin Smart Suggestions & Add Member Panel */}
+          {isSuperAdmin && (
+            <div className="space-y-4">
+              {/* Smart Merge Suggestions */}
+              {smartSuggestions.length > 0 && (
+                <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-600/10 border-2 border-amber-300 rounded-3xl p-5 shadow-sm space-y-3">
+                  <div className="flex items-center space-x-2 text-amber-900 font-extrabold text-sm">
+                    <UserCheck className="w-5 h-5 text-orange-600" />
+                    <span>Smart User Merge Suggestions ({smartSuggestions.length})</span>
+                  </div>
+                  <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                    The backend detected collection records logged on the field that match logged-in Google OAuth users. Click merge to link their contribution history into their account.
+                  </p>
+
+                  <div className="space-y-2">
+                    {smartSuggestions.map((sug, idx) => (
+                      <div key={idx} className="bg-white border border-amber-200/80 rounded-2xl p-3 text-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 shadow-xs">
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-extrabold text-slate-900">{sug.collectionName}</span>
+                            <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-md border border-amber-200">{sug.collectionArea}</span>
+                            <span className="text-[10px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded-md">{sug.collectionCount} collection(s)</span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Matches account: <span className="font-bold text-orange-600">{sug.suggestedUserName}</span> ({sug.suggestedUserEmail})
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleMergeCollectionUser(sug.collectionName, sug.suggestedUserEmail)}
+                          className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-xs shadow-xs transition transform active:scale-95 shrink-0"
+                        >
+                          🔗 Merge Under Account
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Add New Member Form Panel */}
+              <div className="bg-white border border-amber-200/80 rounded-3xl p-5 shadow-sm space-y-4">
+                <div className="flex items-center space-x-2 text-slate-900 font-extrabold text-sm border-b border-amber-100 pb-3">
+                  <PlusCircle className="w-5 h-5 text-emerald-600" />
+                  <span>Manually Add New Club Member</span>
+                </div>
+
+                <form onSubmit={handleAddMemberSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Member Full Name *</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Ramesh Kumar"
+                      value={addMemberForm.name}
+                      onChange={(e) => setAddMemberForm(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-semibold text-slate-800 focus:outline-none focus:border-orange-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Area / Wing *</label>
+                    <select
+                      value={addMemberForm.area}
+                      onChange={(e) => setAddMemberForm(prev => ({ ...prev, area: e.target.value }))}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-semibold text-slate-800 focus:outline-none focus:border-orange-500"
+                      required
+                    >
+                      <option value="">-- Select Area / Wing --</option>
+                      {(settings.areaOptions || []).map((area, idx) => (
+                        <option key={idx} value={area}>{area}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Google Email (Optional)</label>
+                    <input
+                      type="email"
+                      placeholder="ramesh@gmail.com"
+                      value={addMemberForm.email}
+                      onChange={(e) => setAddMemberForm(prev => ({ ...prev, email: e.target.value }))}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-semibold text-slate-800 focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Assigned Role</label>
+                    <select
+                      value={addMemberForm.role}
+                      onChange={(e) => setAddMemberForm(prev => ({ ...prev, role: e.target.value as any }))}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-semibold text-slate-800 focus:outline-none focus:border-orange-500"
+                    >
+                      <option value="MEMBER">MEMBER (Standard Access)</option>
+                      <option value="COLLECTOR">COLLECTOR (Field Cash Collector)</option>
+                      <option value="TREASURER">TREASURER (Financial Auditor)</option>
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-2 pt-2 flex items-center justify-between">
+                    {addMemberMsg && (
+                      <span className={`text-xs font-bold ${addMemberMsg.startsWith('Error') ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        {addMemberMsg}
+                      </span>
+                    )}
+                    <button
+                      type="submit"
+                      className="ml-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs shadow-sm transition transform active:scale-95 flex items-center space-x-1.5"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      <span>Add to Directory</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Members Directory Searchable List */}
+          <div className="bg-white border border-amber-200/80 rounded-3xl p-5 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-amber-100 pb-3">
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-emerald-600" />
+                  <span>Public Members Directory ({membersDirectory.length})</span>
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium">All active members, registered OAuth users, and field collection entities</p>
+              </div>
+
+              <input
+                type="text"
+                placeholder="🔍 Search member name or area..."
+                value={searchMemberQuery}
+                onChange={(e) => setSearchMemberQuery(e.target.value)}
+                className="w-full sm:w-64 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 font-semibold focus:outline-none focus:border-orange-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {membersDirectory
+                .filter(m => !searchMemberQuery || m.name.toLowerCase().includes(searchMemberQuery.toLowerCase()) || m.area.toLowerCase().includes(searchMemberQuery.toLowerCase()))
+                .map((m) => (
+                  <div key={m.id} className="p-3.5 rounded-2xl border border-slate-100 bg-gradient-to-br from-slate-50/50 to-white hover:border-amber-200 transition shadow-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2.5">
+                        {m.image ? (
+                          <img src={m.image} alt={m.name} className="w-8 h-8 rounded-full border border-amber-300 object-cover shrink-0" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                            {m.name.charAt(0)}
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-extrabold text-slate-900 text-xs leading-tight">{m.name}</p>
+                          <span className="text-[10px] text-slate-500 font-medium">{m.area}</span>
+                        </div>
+                      </div>
+
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${m.role === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-800 border border-purple-200' : m.role === 'COLLECTOR' ? 'bg-orange-100 text-orange-800 border border-orange-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'}`}>
+                        {m.role}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
+                      <span className="text-slate-500 font-semibold">Total Contribution:</span>
+                      <span className="font-black text-emerald-600 text-xs">₹{m.totalContributed.toLocaleString()} ({m.countContributed} records)</span>
+                    </div>
+                  </div>
+                ))}
+            </div>
           </div>
         </div>
       )}

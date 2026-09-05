@@ -21,9 +21,10 @@
    - Super Admin Role Console in [src/app/api/admin/roles/route.ts](file:///home/rohit/ganesh_puja_2026/src/app/api/admin/roles/route.ts).
 7. **Super Admin Branding & Customization Feature**:
    - Image Upload for App Logo, visual color theme selector, and custom UI button labels.
-8. **Cash Handover Digital Voucher & Area Terminology Feature** *(Built via `feature/collector-handover-pdf-whatsapp` branch)*:
+8. **Cash Handover Digital Voucher & Area Terminology Feature**:
    - **Global Area / Wing Terminology**: Updated terminology from "Flat No" to "Area / Wing" across member contributions, collector vaults, vouchers, and CSV audit reports.
    - **Digital Cash Handover Voucher Modal**: Created an interactive digital voucher for cash handovers with 1-click **WhatsApp sharing** and approval tracking.
+9. **Smart User Management & Public Members Directory Blueprint**: Formulated architectural blueprint in [docs/smart-user-management-plan.md](file:///home/rohit/ganesh_puja_2026/docs/smart-user-management-plan.md).
 
 ---
 
