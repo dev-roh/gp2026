@@ -54,6 +54,7 @@ export interface Contribution {
 export interface CollectorTransfer {
   id: string;
   contributionId?: string;
+  contributionIds?: string[];
   amount: number;
   fromCollectorEmail: string;
   fromCollectorName: string;

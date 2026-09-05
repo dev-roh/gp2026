@@ -450,7 +450,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Forbidden. Only collectors can initiate fund transfers.' }, { status: 403 });
       }
 
-      const { contributionId, toCollectorEmail, notes } = data;
+      const { contributionId, contributionIds, toCollectorEmail, notes } = data;
       if (!toCollectorEmail) {
         return NextResponse.json({ error: 'Target collector email is required.' }, { status: 400 });
       }
@@ -461,31 +461,40 @@ export async function POST(req: Request) {
       }
 
       let amountToTransfer = 0;
-      let contributionItem: any = null;
+      const targetContributionIds: string[] = [];
 
-      if (contributionId) {
-        contributionItem = db.contributions.find(c => c.id === contributionId);
-        if (!contributionItem) {
-          return NextResponse.json({ error: 'Contribution entry not found.' }, { status: 404 });
+      if (Array.isArray(contributionIds) && contributionIds.length > 0) {
+        targetContributionIds.push(...contributionIds);
+      } else if (contributionId) {
+        targetContributionIds.push(contributionId);
+      }
+
+      if (targetContributionIds.length > 0) {
+        const items = db.contributions.filter(c => targetContributionIds.includes(c.id));
+        if (items.length === 0) {
+          return NextResponse.json({ error: 'No matching contribution entries found.' }, { status: 404 });
         }
 
-        // Ownership check: only the current collector of this entry can transfer it
-        if (contributionItem.collectorId.toLowerCase() !== userEmail.toLowerCase() && userRole !== 'SUPER_ADMIN') {
+        // Ownership check: only the current collector of these entries can transfer them
+        const unauthorized = items.some(c => c.collectorId.toLowerCase() !== userEmail.toLowerCase());
+        if (unauthorized && userRole !== 'SUPER_ADMIN') {
           return NextResponse.json({ error: 'Forbidden. You can only transfer contribution entries assigned to your account.' }, { status: 403 });
         }
 
-        if (contributionItem.status !== 'APPROVED') {
+        const unapproved = items.some(c => c.status !== 'APPROVED');
+        if (unapproved) {
           return NextResponse.json({ error: 'Only approved collection entries can be transferred.' }, { status: 400 });
         }
 
-        amountToTransfer = contributionItem.amount;
+        amountToTransfer = items.reduce((sum, c) => sum + c.amount, 0);
       }
 
       if (!db.collectorTransfers) db.collectorTransfers = [];
 
       const newTransfer = {
         id: `trans-${Date.now()}`,
-        contributionId,
+        contributionId: targetContributionIds.length === 1 ? targetContributionIds[0] : undefined,
+        contributionIds: targetContributionIds.length > 0 ? targetContributionIds : undefined,
         amount: amountToTransfer,
         fromCollectorEmail: userEmail.toLowerCase(),
         fromCollectorName: session.user?.name || 'Collector',
@@ -504,7 +513,7 @@ export async function POST(req: Request) {
         id: `notif-${Date.now()}`,
         recipientEmail: targetCollector.email,
         title: 'Collector Transfer Request 🔄',
-        message: `${session.user?.name || 'Collector'} requested transfer of ₹${amountToTransfer} (${contributionItem ? `Entry: ${contributionItem.memberName}` : 'Cash'}) to you.`,
+        message: `${session.user?.name || 'Collector'} requested transfer of ₹${amountToTransfer} (${targetContributionIds.length > 0 ? `${targetContributionIds.length} entry/entries` : 'Cash'}) to you.`,
         type: 'COLLECTOR_TRANSFER_REQUEST',
         targetId: newTransfer.id,
         isRead: false,
@@ -536,13 +545,21 @@ export async function POST(req: Request) {
       transfer.decidedAt = new Date().toISOString();
 
       if (decision === 'APPROVE') {
-        // If tied to a specific contribution entry, update its collector attribution
-        if (transfer.contributionId) {
-          const contrib = db.contributions.find(c => c.id === transfer.contributionId);
-          if (contrib) {
-            contrib.collectorId = transfer.toCollectorEmail;
-            contrib.collectorName = transfer.toCollectorName;
-          }
+        // Update collector attribution for single or bulk transfer
+        const idsToUpdate = new Set<string>();
+        if (Array.isArray(transfer.contributionIds) && transfer.contributionIds.length > 0) {
+          transfer.contributionIds.forEach(id => idsToUpdate.add(id));
+        } else if (transfer.contributionId) {
+          idsToUpdate.add(transfer.contributionId);
+        }
+
+        if (idsToUpdate.size > 0) {
+          db.contributions.forEach(c => {
+            if (idsToUpdate.has(c.id)) {
+              c.collectorId = transfer.toCollectorEmail;
+              c.collectorName = transfer.toCollectorName;
+            }
+          });
         }
 
         // Notify initiating collector

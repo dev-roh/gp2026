@@ -525,13 +525,19 @@ export default function HomePage() {
     e.preventDefault();
     if (!targetTransferCollectorEmail) return;
 
+    const idsToTransfer = selectedContributionForTransfer
+      ? [selectedContributionForTransfer.id]
+      : selectedContributionIds;
+
+    if (idsToTransfer.length === 0) return;
+
     const res = await fetch('/api/finance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type: 'INITIATE_COLLECTOR_TRANSFER',
         data: {
-          contributionId: selectedContributionForTransfer?.id,
+          contributionIds: idsToTransfer,
           toCollectorEmail: targetTransferCollectorEmail,
           notes: transferNotes
         }
@@ -542,6 +548,7 @@ export default function HomePage() {
     if (res.ok) {
       alert(`✅ ${result.message}`);
       setSelectedContributionForTransfer(null);
+      setSelectedContributionIds([]);
       setTargetTransferCollectorEmail('');
       setTransferNotes('');
       fetchFinanceData();
@@ -1883,12 +1890,12 @@ export default function HomePage() {
         <div className="bg-white border border-amber-200/80 rounded-3xl p-5 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-amber-100 pb-3">
             <div className="flex items-center space-x-2">
-              {(isTreasurer || isSuperAdmin) && contributions.length > 0 && (
+              {(isCollector || isTreasurer || isSuperAdmin) && contributions.length > 0 && (
                 <input
                   type="checkbox"
                   checked={selectedContributionIds.length === contributions.length && contributions.length > 0}
                   onChange={toggleSelectAllContributions}
-                  className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300"
+                  className="w-4 h-4 rounded text-orange-600 focus:ring-orange-500 border-slate-300"
                   title="Select all contributions"
                 />
               )}
@@ -1898,6 +1905,21 @@ export default function HomePage() {
             </div>
 
             <div className="flex items-center space-x-2">
+              {isCollector && selectedContributionIds.length > 0 && (
+                <button
+                  onClick={() => {
+                    setSelectedContributionForTransfer(null);
+                    if (collectorsList.length > 0) {
+                      setTargetTransferCollectorEmail(collectorsList.find(u => u.email.toLowerCase() !== (session?.user?.email || '').toLowerCase())?.email || '');
+                    }
+                  }}
+                  className="text-xs px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-xs flex items-center space-x-1"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Transfer Selected ({selectedContributionIds.length})</span>
+                </button>
+              )}
+
               {(isTreasurer || isSuperAdmin) && selectedContributionIds.length > 0 && (
                 <button
                   onClick={() => {
@@ -1925,12 +1947,12 @@ export default function HomePage() {
             {contributions.map((c) => (
               <div key={c.id} className="py-3 text-xs flex justify-between items-center">
                 <div className="flex items-center space-x-3">
-                  {(isTreasurer || isSuperAdmin) && (
+                  {(isCollector || isTreasurer || isSuperAdmin) && (
                     <input
                       type="checkbox"
                       checked={selectedContributionIds.includes(c.id)}
                       onChange={() => toggleSelectContribution(c.id)}
-                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 shrink-0"
+                      className="w-4 h-4 rounded text-orange-600 focus:ring-orange-500 border-slate-300 shrink-0"
                     />
                   )}
                   <div>
@@ -2858,19 +2880,32 @@ export default function HomePage() {
       )}
 
       {/* Transfer Collection Entry Modal */}
-      {selectedContributionForTransfer && (
+      {(selectedContributionForTransfer || selectedContributionIds.length > 0) && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white border border-amber-200 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
             <div className="flex items-center space-x-2 text-orange-600 border-b border-amber-100 pb-3">
               <Share2 className="w-5 h-5" />
-              <h3 className="font-extrabold text-slate-900 text-sm">Transfer Collection Entry</h3>
+              <h3 className="font-extrabold text-slate-900 text-sm">
+                {selectedContributionForTransfer ? 'Transfer Collection Entry' : `Bulk Transfer (${selectedContributionIds.length} Entries)`}
+              </h3>
             </div>
 
             <div className="bg-amber-50/60 border border-amber-200/80 rounded-2xl p-3 text-xs space-y-1">
-              <p className="text-slate-500 font-semibold">Entry Details:</p>
-              <p className="font-extrabold text-slate-900">{selectedContributionForTransfer.memberName} ({selectedContributionForTransfer.memberArea})</p>
-              <p className="font-black text-emerald-600 text-sm">Amount: ₹{selectedContributionForTransfer.amount.toLocaleString()}</p>
-              <p className="text-[10px] text-slate-500 font-mono">Receipt: {selectedContributionForTransfer.receiptNo}</p>
+              <p className="text-slate-500 font-semibold">Transfer Summary:</p>
+              {selectedContributionForTransfer ? (
+                <>
+                  <p className="font-extrabold text-slate-900">{selectedContributionForTransfer.memberName} ({selectedContributionForTransfer.memberArea})</p>
+                  <p className="font-black text-emerald-600 text-sm">Amount: ₹{selectedContributionForTransfer.amount.toLocaleString()}</p>
+                  <p className="text-[10px] text-slate-500 font-mono">Receipt: {selectedContributionForTransfer.receiptNo}</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-extrabold text-slate-900">{selectedContributionIds.length} contribution records selected</p>
+                  <p className="font-black text-emerald-600 text-sm">
+                    Total Amount: ₹{contributions.filter(c => selectedContributionIds.includes(c.id)).reduce((sum, c) => sum + c.amount, 0).toLocaleString()}
+                  </p>
+                </>
+              )}
             </div>
 
             <form onSubmit={handleInitiateTransferSubmit} className="space-y-3 text-xs">
@@ -2905,7 +2940,10 @@ export default function HomePage() {
               <div className="pt-2 flex gap-2">
                 <button 
                   type="button" 
-                  onClick={() => setSelectedContributionForTransfer(null)} 
+                  onClick={() => {
+                    setSelectedContributionForTransfer(null);
+                    setSelectedContributionIds([]);
+                  }} 
                   className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition"
                 >
                   Cancel
