@@ -35,6 +35,11 @@
    - **CredentialsProvider**: Added NextAuth provider `sso-gateway` for JWT token verification with secret `@@Secure@@sso@secret123`.
    - **Client Interceptor**: Intercepts `?sso_token=<JWT_TOKEN>` on landing, authenticates seamlessly, and cleans token from URL history.
    - **Portal Redirection**: Updated UI Sign In button to redirect directly to `https://www.luhurachati.com`.
+12. **Single & Bulk Contribution Deletion with Mandatory Reasons**:
+   - **Role Scoping**: Exclusive to `TREASURER` and `SUPER_ADMIN` roles.
+   - **Single & Bulk Select**: Individual delete trash buttons per entry + checkbox bulk selection.
+   - **Mandatory Reason Modal**: Requires explicit deletion reason input before confirming.
+   - **Audit Trail**: Generates immutable audit notifications logging the deleted item details, actor, and mandatory reason.
 
 ---
 
