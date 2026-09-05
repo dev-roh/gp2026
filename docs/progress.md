@@ -24,7 +24,13 @@
 8. **Cash Handover Digital Voucher & Area Terminology Feature**:
    - **Global Area / Wing Terminology**: Updated terminology from "Flat No" to "Area / Wing" across member contributions, collector vaults, vouchers, and CSV audit reports.
    - **Digital Cash Handover Voucher Modal**: Created an interactive digital voucher for cash handovers with 1-click **WhatsApp sharing** and approval tracking.
-9. **Smart User Management & Public Members Directory Blueprint**: Formulated architectural blueprint in [docs/smart-user-management-plan.md](file:///home/rohit/ganesh_puja_2026/docs/smart-user-management-plan.md).
+9. **Smart User Management & Public Members Directory**:
+   - **Smart Matching**: Auto-links collection records to newly registered OAuth users and submits auto-membership requests.
+   - **Super Admin Console & Suggestions**: Smart merge suggestions and manual member pre-registration.
+   - **Public Members Directory**: Searchable directory visible to all verified club members.
+10. **Collector-to-Collector Fund & Entry Transfer Workflow**:
+   - **Scoped Transfer Button**: Collectors can transfer individual collection entries to another collector.
+   - **Two-Way Approval**: Recipient collector receives notification & approves transfer before ownership & cash attribution update.
 
 ---
 
