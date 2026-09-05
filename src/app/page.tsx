@@ -981,15 +981,24 @@ export default function HomePage() {
             <span>Central SSO Identity Gateway</span>
           </div>
 
-          <a
-            href="https://www.luhurachati.com"
-            className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-xs shadow-md flex items-center justify-center space-x-2 transition transform active:scale-95"
-          >
-            <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-              <path d="M12.24 10.285V13.4h6.887c-.58 3.424-3.57 5.767-6.887 5.767-4.12 0-7.464-3.344-7.464-7.464S8.12 4.238 12.24 4.238c1.86 0 3.55.674 4.86 1.785l2.454-2.453C17.754 1.83 15.16.8 12.24.8 6.03.8 1 5.83 1 12.04s5.03 11.24 11.24 11.24c6.49 0 10.8-4.56 10.8-10.98 0-.74-.08-1.46-.2-2.015H12.24z"/>
-            </svg>
-            <span>Sign in via Luhurachati Portal</span>
-          </a>
+          <div className="flex flex-col space-y-2">
+            <button
+              onClick={() => signIn('google')}
+              className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-xs shadow-md flex items-center justify-center space-x-2 transition transform active:scale-95"
+            >
+              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                <path d="M12.24 10.285V13.4h6.887c-.58 3.424-3.57 5.767-6.887 5.767-4.12 0-7.464-3.344-7.464-7.464S8.12 4.238 12.24 4.238c1.86 0 3.55.674 4.86 1.785l2.454-2.453C17.754 1.83 15.16.8 12.24.8 6.03.8 1 5.83 1 12.04s5.03 11.24 11.24 11.24c6.49 0 10.8-4.56 10.8-10.98 0-.74-.08-1.46-.2-2.015H12.24z"/>
+              </svg>
+              <span>Direct Sign in with Google</span>
+            </button>
+
+            <a
+              href="https://www.luhurachati.com"
+              className="w-full py-3 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs border border-slate-200 flex items-center justify-center space-x-2 transition transform active:scale-95"
+            >
+              <span>🌐 Sign in via Central SSO Portal</span>
+            </a>
+          </div>
 
           <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-500 flex justify-center space-x-3 font-medium">
             <a href="/privacy" className="hover:text-orange-600 underline">Privacy Policy</a>
