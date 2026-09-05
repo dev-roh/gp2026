@@ -1109,8 +1109,8 @@ export default function HomePage() {
         </div>
 
         {/* Action Buttons - Role Scoped */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-slate-100">
-          {isCollector ? (
+        <div className={`grid gap-2 pt-3 border-t border-slate-100 ${isCollector ? 'grid-cols-2 sm:grid-cols-4' : isMember ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
+          {isCollector && (
             <button 
               onClick={() => setShowAddContribution(true)}
               className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-800 text-xs font-bold transition shadow-xs"
@@ -1118,14 +1118,9 @@ export default function HomePage() {
               <PlusCircle className="w-4.5 h-4.5 mb-1 text-orange-600" />
               {settings.collectionButtonLabel}
             </button>
-          ) : (
-            <div className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-slate-400 text-xs font-bold cursor-not-allowed" title="Only Collectors can record contributions">
-              <Lock className="w-4.5 h-4.5 mb-1 text-slate-400" />
-              {settings.collectionButtonLabel}
-            </div>
           )}
 
-          {isMember ? (
+          {isMember && (
             <button 
               onClick={() => setShowAddExpense(true)}
               className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-800 text-xs font-bold transition shadow-xs"
@@ -1133,11 +1128,6 @@ export default function HomePage() {
               <TrendingDown className="w-4.5 h-4.5 mb-1 text-rose-600" />
               {settings.spendButtonLabel}
             </button>
-          ) : (
-            <div className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-slate-400 text-xs font-bold cursor-not-allowed" title="Only Members can log expenses">
-              <Lock className="w-4.5 h-4.5 mb-1 text-slate-400" />
-              {settings.spendButtonLabel}
-            </div>
           )}
 
           <button 
@@ -1166,20 +1156,24 @@ export default function HomePage() {
         >
           Overview
         </button>
-        {isMember && (
-          <button 
-            onClick={() => setActiveTab('members')} 
-            className={`flex-1 py-2 px-3.5 rounded-xl text-center whitespace-nowrap transition flex items-center justify-center space-x-1 ${activeTab === 'members' ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>Members Directory</span>
-          </button>
-        )}
         <button 
           onClick={() => setActiveTab('programmes')} 
           className={`flex-1 py-2 px-3.5 rounded-xl text-center whitespace-nowrap transition flex items-center justify-center space-x-1 ${activeTab === 'programmes' ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
         >
           <span>Schedule & Media</span>
+        </button>
+        <button 
+          onClick={() => setActiveTab('contributions')} 
+          className={`flex-1 py-2 px-3.5 rounded-xl text-center whitespace-nowrap transition ${activeTab === 'contributions' ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+        >
+          Collections
+        </button>
+        <button 
+          onClick={() => setActiveTab('members')} 
+          className={`flex-1 py-2 px-3.5 rounded-xl text-center whitespace-nowrap transition flex items-center justify-center space-x-1 ${activeTab === 'members' ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+        >
+          <Users className="w-3.5 h-3.5" />
+          <span>Members Directory</span>
         </button>
 
         {(totalPendingActionCount > 0 || isSuperAdmin || isTreasurer) && (
@@ -1200,29 +1194,28 @@ export default function HomePage() {
         >
           Collectors
         </button>
-        <button 
-          onClick={() => setActiveTab('contributions')} 
-          className={`flex-1 py-2 px-3.5 rounded-xl text-center whitespace-nowrap transition ${activeTab === 'contributions' ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-        >
-          Collections
-        </button>
-        <button 
-          onClick={() => setActiveTab('expenses')} 
-          className={`flex-1 py-2 px-3.5 rounded-xl text-center whitespace-nowrap transition ${activeTab === 'expenses' ? 'bg-gradient-to-r from-rose-500 to-red-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-        >
-          Expenses
-        </button>
-        <button 
-          onClick={() => setActiveTab('reimbursements')} 
-          className={`flex-1 py-2 px-3.5 rounded-xl text-center whitespace-nowrap transition flex items-center justify-center space-x-1 ${activeTab === 'reimbursements' ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-        >
-          <span>Reimbursements</span>
-          {expenses.filter(e => e.isOutofPocket && !e.isReimbursed).length > 0 && (
-            <span className="px-1.5 py-0.2 text-[9px] rounded-full bg-emerald-600 text-white font-black">
-              {expenses.filter(e => e.isOutofPocket && !e.isReimbursed).length}
-            </span>
-          )}
-        </button>
+
+        {!isViewOnly && (
+          <>
+            <button 
+              onClick={() => setActiveTab('expenses')} 
+              className={`flex-1 py-2 px-3.5 rounded-xl text-center whitespace-nowrap transition ${activeTab === 'expenses' ? 'bg-gradient-to-r from-rose-500 to-red-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+            >
+              Expenses
+            </button>
+            <button 
+              onClick={() => setActiveTab('reimbursements')} 
+              className={`flex-1 py-2 px-3.5 rounded-xl text-center whitespace-nowrap transition flex items-center justify-center space-x-1 ${activeTab === 'reimbursements' ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+            >
+              <span>Reimbursements</span>
+              {expenses.filter(e => e.isOutofPocket && !e.isReimbursed).length > 0 && (
+                <span className="px-1.5 py-0.2 text-[9px] rounded-full bg-emerald-600 text-white font-black">
+                  {expenses.filter(e => e.isOutofPocket && !e.isReimbursed).length}
+                </span>
+              )}
+            </button>
+          </>
+        )}
 
         {isSuperAdmin && (
           <>

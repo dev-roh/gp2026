@@ -11,9 +11,9 @@ export async function GET(req: Request) {
     const userEmail = session?.user?.email;
     const userRole = getUserRole(userEmail);
 
-    // Only authenticated users (MEMBER, COLLECTOR, TREASURER, SUPER_ADMIN) can view the member directory
-    if (!userEmail || userRole === 'VIEW_ONLY') {
-      return NextResponse.json({ error: 'Access denied. Only registered members can view the member directory.' }, { status: 403 });
+    // All authenticated users can view the member directory
+    if (!userEmail) {
+      return NextResponse.json({ error: 'Access denied. Please sign in.' }, { status: 401 });
     }
 
     const db = await getDbAsync();
