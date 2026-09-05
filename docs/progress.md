@@ -31,6 +31,10 @@
 10. **Collector-to-Collector Fund & Entry Transfer Workflow**:
    - **Scoped Transfer Button**: Collectors can transfer individual collection entries to another collector.
    - **Two-Way Approval**: Recipient collector receives notification & approves transfer before ownership & cash attribution update.
+11. **Central SSO Authentication Gateway Integration**:
+   - **CredentialsProvider**: Added NextAuth provider `sso-gateway` for JWT token verification with secret `@@Secure@@sso@secret123`.
+   - **Client Interceptor**: Intercepts `?sso_token=<JWT_TOKEN>` on landing, authenticates seamlessly, and cleans token from URL history.
+   - **Portal Redirection**: Updated UI Sign In button to redirect directly to `https://www.luhurachati.com`.
 
 ---
 
