@@ -383,11 +383,65 @@ export default function HomePage() {
   const [registeredUsers, setRegisteredUsers] = useState<DbUser[]>([]);
 
   // Members Directory & Smart User Management States
-  const [membersDirectory, setMembersDirectory] = useState<Array<{ id: string; name: string; area: string; role: string; email?: string; image?: string; isRegistered: boolean; totalContributed: number; countContributed: number }>>([]);
+  const [membersDirectory, setMembersDirectory] = useState<Array<{ id: string; name: string; area: string; role: string; email?: string; phone?: string; image?: string; isRegistered: boolean; totalContributed: number; countContributed: number }>>([]);
   const [smartSuggestions, setSmartSuggestions] = useState<Array<{ collectionName: string; collectionArea: string; collectionCount: number; suggestedUserEmail: string; suggestedUserName: string; confidence: string }>>([]);
   const [addMemberForm, setAddMemberForm] = useState({ name: '', area: '', phone: '', email: '', role: 'MEMBER' as 'MEMBER' | 'COLLECTOR' | 'TREASURER' });
   const [addMemberMsg, setAddMemberMsg] = useState('');
   const [searchMemberQuery, setSearchMemberQuery] = useState('');
+
+  // Edit User details state
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [editUserForm, setEditUserForm] = useState({ userId: '', name: '', email: '', phone: '', area: '' });
+  const [editUserMsg, setEditUserMsg] = useState('');
+  const [isSubmittingEditUser, setIsSubmittingEditUser] = useState(false);
+
+  const handleOpenEditUser = (member: { id: string; name: string; area: string; email?: string; phone?: string }) => {
+    setEditUserForm({
+      userId: member.id,
+      name: member.name || '',
+      email: member.email || '',
+      phone: member.phone || '',
+      area: member.area || ''
+    });
+    setEditUserMsg('');
+    setShowEditUserModal(true);
+  };
+
+  const handleEditUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editUserForm.name.trim()) return;
+
+    setIsSubmittingEditUser(true);
+    setEditUserMsg('Updating member details...');
+
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'EDIT_USER',
+          ...editUserForm
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setEditUserMsg(`✅ ${data.message || 'Member details updated successfully!'}`);
+        setTimeout(() => {
+          setShowEditUserModal(false);
+          setEditUserMsg('');
+        }, 1200);
+        fetchMembersDirectory();
+        fetchFinanceData();
+      } else {
+        setEditUserMsg(`Error: ${data.error || 'Failed to update member details'}`);
+      }
+    } catch (err) {
+      setEditUserMsg('Error submitting edit request');
+    } finally {
+      setIsSubmittingEditUser(false);
+    }
+  };
 
   const fetchMembersDirectory = async () => {
     try {
@@ -1869,9 +1923,20 @@ export default function HomePage() {
                         </div>
                       </div>
 
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${m.role === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-800 border border-purple-200' : m.role === 'COLLECTOR' ? 'bg-orange-100 text-orange-800 border border-orange-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'}`}>
-                        {m.role}
-                      </span>
+                      <div className="flex items-center space-x-1.5">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${m.role === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-800 border border-purple-200' : m.role === 'COLLECTOR' ? 'bg-orange-100 text-orange-800 border border-orange-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'}`}>
+                          {m.role}
+                        </span>
+                        {(isSuperAdmin || isTreasurer) && (
+                          <button
+                            onClick={() => handleOpenEditUser(m)}
+                            className="px-2 py-0.5 text-[10px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition"
+                            title="Edit Member Details"
+                          >
+                            ✏️ Edit
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
@@ -1882,6 +1947,94 @@ export default function HomePage() {
                 ))}
             </div>
           </div>
+
+          {/* EDIT MEMBER DETAILS MODAL */}
+          {showEditUserModal && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white border border-amber-200 rounded-3xl p-6 shadow-2xl max-w-md w-full space-y-4 animate-in fade-in zoom-in duration-200">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+                    <span>✏️ Edit Member Details</span>
+                  </h3>
+                  <button
+                    onClick={() => setShowEditUserModal(false)}
+                    className="text-slate-400 hover:text-slate-600 font-bold text-base"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <form onSubmit={handleEditUserSubmit} className="space-y-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editUserForm.name}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-semibold focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Locality / Area / Wing</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Block A, Sector 4"
+                      value={editUserForm.area}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, area: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-semibold focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Mobile / Phone</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. +91 9876543210"
+                      value={editUserForm.phone}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, phone: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-semibold focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      placeholder="user@example.com"
+                      value={editUserForm.email}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-semibold focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  {editUserMsg && (
+                    <p className={`text-xs font-bold ${editUserMsg.startsWith('✅') ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {editUserMsg}
+                    </p>
+                  )}
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setShowEditUserModal(false)}
+                      className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmittingEditUser}
+                      className="px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 rounded-xl shadow-xs transition disabled:opacity-50"
+                    >
+                      {isSubmittingEditUser ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

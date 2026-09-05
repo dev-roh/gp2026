@@ -19,7 +19,7 @@ export async function GET(req: Request) {
     const db = await getDbAsync();
 
     // Aggregated Members list for public directory
-    const memberDirectoryMap: Record<string, { id: string; name: string; area: string; role: string; email?: string; image?: string; isRegistered: boolean; totalContributed: number; countContributed: number }> = {};
+    const memberDirectoryMap: Record<string, { id: string; name: string; area: string; role: string; email?: string; phone?: string; image?: string; isRegistered: boolean; totalContributed: number; countContributed: number }> = {};
 
     // 1. Process registered & manual users
     db.users.forEach(u => {
@@ -33,6 +33,7 @@ export async function GET(req: Request) {
         area: u.area || 'General Area',
         role: u.role,
         email: u.email,
+        phone: u.phone,
         image: u.image,
         isRegistered: !u.isManual,
         totalContributed,
@@ -265,6 +266,81 @@ export async function POST(req: Request) {
 
       await saveDbAsync(db);
       return NextResponse.json({ success: true, message: `Membership request ${status.toLowerCase()} successfully.` });
+    }
+
+    // ACTION 4: Edit Member Details
+    if (action === 'EDIT_USER') {
+      const { userId, name, email, phone, area } = body;
+      if (!userId) {
+        return NextResponse.json({ error: 'User ID is required.' }, { status: 400 });
+      }
+
+      if (!name || !name.trim()) {
+        return NextResponse.json({ error: 'Member name is required.' }, { status: 400 });
+      }
+
+      let user = db.users.find(u => u.id === userId || u.email.toLowerCase() === (email || '').toLowerCase());
+
+      // If user entry is from unlinked collection entity, convert/register as user entry
+      if (!user && userId.startsWith('entry-')) {
+        const entryName = userId.replace('entry-', '');
+        user = {
+          id: `usr-man-${Date.now()}`,
+          name: name.trim(),
+          email: (email && email.trim()) ? email.trim().toLowerCase() : `manual_${Date.now()}@gp2026.local`,
+          role: 'MEMBER',
+          area: area || 'General Area',
+          phone: phone || '',
+          isManual: true,
+          createdAt: new Date().toISOString()
+        };
+        db.users.push(user);
+
+        // Relink contributions from entryName to new user
+        db.contributions.forEach(c => {
+          if (c.memberName && c.memberName.trim().toLowerCase() === entryName.toLowerCase()) {
+            c.memberId = user!.id;
+            c.memberName = user!.name;
+            if (area) c.memberArea = area;
+          }
+        });
+      } else if (user) {
+        const oldName = user.name;
+        const oldEmail = user.email;
+
+        user.name = name.trim();
+        if (phone !== undefined) user.phone = phone.trim();
+        if (area !== undefined) user.area = area.trim();
+
+        if (email && email.trim() && email.trim().toLowerCase() !== oldEmail.toLowerCase()) {
+          const newEmail = email.trim().toLowerCase();
+          // Update roleAssignment key if present
+          if (db.roleAssignments[oldEmail.toLowerCase()]) {
+            const roleData = db.roleAssignments[oldEmail.toLowerCase()];
+            delete db.roleAssignments[oldEmail.toLowerCase()];
+            db.roleAssignments[newEmail] = {
+              ...roleData,
+              email: newEmail,
+              updatedAt: new Date().toISOString()
+            };
+          }
+          user.email = newEmail;
+        }
+
+        // Update contributions where memberId or memberName matches
+        db.contributions.forEach(c => {
+          if (c.memberId === user!.id || (c.memberName && c.memberName.trim().toLowerCase() === oldName.toLowerCase())) {
+            c.memberId = user!.id;
+            c.memberName = user!.name;
+            if (user!.area) c.memberArea = user!.area;
+          }
+        });
+      } else {
+        return NextResponse.json({ error: 'User record not found.' }, { status: 404 });
+      }
+
+      await saveDbAsync(db);
+      return NextResponse.json({ success: true, user, message: `Successfully updated member details for ${name.trim()}.` });
     }
 
     return NextResponse.json({ error: 'Invalid action provided.' }, { status: 400 });
