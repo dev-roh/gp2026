@@ -85,11 +85,15 @@ export async function GET(req: Request) {
     (c.status === 'PENDING_SUPER_ADMIN_APPROVAL' && userRole === 'SUPER_ADMIN')
   );
 
+  const pendingCollectorTransfersForMe = (db.collectorTransfers || []).filter(t =>
+    t.status === 'PENDING' && t.toCollectorEmail.toLowerCase() === userEmail.toLowerCase()
+  );
+
   const pendingMembershipRequestsCount = (userRole === 'SUPER_ADMIN' || userRole === 'TREASURER')
     ? (db.membershipRequests || []).filter(r => r.status === 'PENDING').length
     : 0;
 
-  const totalPendingActionCount = pendingApprovalsForMe.length + pendingMembershipRequestsCount;
+  const totalPendingActionCount = pendingApprovalsForMe.length + pendingCollectorTransfersForMe.length + pendingMembershipRequestsCount;
 
   return NextResponse.json({
     settings: db.settings,
@@ -104,6 +108,8 @@ export async function GET(req: Request) {
     collectorBalances,
     latestContributions: db.contributions.slice().reverse(),
     pendingApprovalsForMe,
+    pendingCollectorTransfersForMe,
+    collectorTransfers: (db.collectorTransfers || []).slice().reverse(),
     totalPendingActionCount,
     notifications: myNotifications,
     latestExpenses: db.expenses.slice().reverse(),
@@ -437,6 +443,124 @@ export async function POST(req: Request) {
 
       await saveDbAsync(db);
       return NextResponse.json({ success: true, item: targetReq });
+    }
+
+    if (type === 'INITIATE_COLLECTOR_TRANSFER') {
+      if (userRole !== 'COLLECTOR' && userRole !== 'TREASURER' && userRole !== 'SUPER_ADMIN') {
+        return NextResponse.json({ error: 'Forbidden. Only collectors can initiate fund transfers.' }, { status: 403 });
+      }
+
+      const { contributionId, toCollectorEmail, notes } = data;
+      if (!toCollectorEmail) {
+        return NextResponse.json({ error: 'Target collector email is required.' }, { status: 400 });
+      }
+
+      const targetCollector = db.users.find(u => u.email.toLowerCase() === toCollectorEmail.toLowerCase());
+      if (!targetCollector) {
+        return NextResponse.json({ error: 'Target collector account not found.' }, { status: 404 });
+      }
+
+      let amountToTransfer = 0;
+      let contributionItem: any = null;
+
+      if (contributionId) {
+        contributionItem = db.contributions.find(c => c.id === contributionId);
+        if (!contributionItem) {
+          return NextResponse.json({ error: 'Contribution entry not found.' }, { status: 404 });
+        }
+
+        // Ownership check: only the current collector of this entry can transfer it
+        if (contributionItem.collectorId.toLowerCase() !== userEmail.toLowerCase() && userRole !== 'SUPER_ADMIN') {
+          return NextResponse.json({ error: 'Forbidden. You can only transfer contribution entries assigned to your account.' }, { status: 403 });
+        }
+
+        if (contributionItem.status !== 'APPROVED') {
+          return NextResponse.json({ error: 'Only approved collection entries can be transferred.' }, { status: 400 });
+        }
+
+        amountToTransfer = contributionItem.amount;
+      }
+
+      if (!db.collectorTransfers) db.collectorTransfers = [];
+
+      const newTransfer = {
+        id: `trans-${Date.now()}`,
+        contributionId,
+        amount: amountToTransfer,
+        fromCollectorEmail: userEmail.toLowerCase(),
+        fromCollectorName: session.user?.name || 'Collector',
+        toCollectorEmail: targetCollector.email.toLowerCase(),
+        toCollectorName: targetCollector.name,
+        status: 'PENDING' as const,
+        notes,
+        createdAt: new Date().toISOString()
+      };
+
+      db.collectorTransfers.push(newTransfer);
+
+      // Send notification to receiving collector
+      if (!db.notifications) db.notifications = [];
+      db.notifications.push({
+        id: `notif-${Date.now()}`,
+        recipientEmail: targetCollector.email,
+        title: 'Collector Transfer Request 🔄',
+        message: `${session.user?.name || 'Collector'} requested transfer of ₹${amountToTransfer} (${contributionItem ? `Entry: ${contributionItem.memberName}` : 'Cash'}) to you.`,
+        type: 'COLLECTOR_TRANSFER_REQUEST',
+        targetId: newTransfer.id,
+        isRead: false,
+        date: new Date().toISOString()
+      });
+
+      await saveDbAsync(db);
+      return NextResponse.json({ success: true, item: newTransfer, message: 'Transfer request submitted to collector for approval.' });
+    }
+
+    if (type === 'DECIDE_COLLECTOR_TRANSFER') {
+      const { transferId, decision } = data; // decision: 'APPROVE' | 'REJECT'
+      if (!transferId || !['APPROVE', 'REJECT'].includes(decision)) {
+        return NextResponse.json({ error: 'Valid transfer ID and decision required.' }, { status: 400 });
+      }
+
+      if (!db.collectorTransfers) db.collectorTransfers = [];
+
+      const transfer = db.collectorTransfers.find(t => t.id === transferId);
+      if (!transfer) {
+        return NextResponse.json({ error: 'Collector transfer request not found.' }, { status: 404 });
+      }
+
+      if (transfer.toCollectorEmail.toLowerCase() !== userEmail.toLowerCase() && userRole !== 'SUPER_ADMIN') {
+        return NextResponse.json({ error: 'Forbidden. Only the designated recipient collector can approve this transfer.' }, { status: 403 });
+      }
+
+      transfer.status = decision === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+      transfer.decidedAt = new Date().toISOString();
+
+      if (decision === 'APPROVE') {
+        // If tied to a specific contribution entry, update its collector attribution
+        if (transfer.contributionId) {
+          const contrib = db.contributions.find(c => c.id === transfer.contributionId);
+          if (contrib) {
+            contrib.collectorId = transfer.toCollectorEmail;
+            contrib.collectorName = transfer.toCollectorName;
+          }
+        }
+
+        // Notify initiating collector
+        if (!db.notifications) db.notifications = [];
+        db.notifications.push({
+          id: `notif-${Date.now()}`,
+          recipientEmail: transfer.fromCollectorEmail,
+          title: 'Collector Transfer Approved ✅',
+          message: `${transfer.toCollectorName} accepted your transfer of ₹${transfer.amount}. Ownership updated.`,
+          type: 'COLLECTOR_TRANSFER_APPROVED',
+          targetId: transfer.id,
+          isRead: false,
+          date: new Date().toISOString()
+        });
+      }
+
+      await saveDbAsync(db);
+      return NextResponse.json({ success: true, item: transfer, message: `Transfer ${decision.toLowerCase()}d successfully.` });
     }
 
     return NextResponse.json({ error: 'Invalid operation type' }, { status: 400 });

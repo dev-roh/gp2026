@@ -51,12 +51,26 @@ export interface Contribution {
   isSelfContribution?: boolean;
 }
 
+export interface CollectorTransfer {
+  id: string;
+  contributionId?: string;
+  amount: number;
+  fromCollectorEmail: string;
+  fromCollectorName: string;
+  toCollectorEmail: string;
+  toCollectorName: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  notes?: string;
+  createdAt: string;
+  decidedAt?: string;
+}
+
 export interface NotificationItem {
   id: string;
   recipientEmail: string;
   title: string;
   message: string;
-  type: 'CONTRIBUTION_APPROVAL_REQUIRED' | 'CONTRIBUTION_APPROVED' | 'HANDOVER_APPROVAL_REQUIRED' | 'MEMBERSHIP_REQUEST' | 'MEMBERSHIP_APPROVED';
+  type: 'CONTRIBUTION_APPROVAL_REQUIRED' | 'CONTRIBUTION_APPROVED' | 'HANDOVER_APPROVAL_REQUIRED' | 'MEMBERSHIP_REQUEST' | 'MEMBERSHIP_APPROVED' | 'COLLECTOR_TRANSFER_REQUEST' | 'COLLECTOR_TRANSFER_APPROVED';
   targetId: string;
   isRead: boolean;
   date: string;
@@ -127,6 +141,7 @@ export interface DatabaseSchema {
   expenses: Expense[];
   programmes: ProgrammeItem[];
   membershipRequests: MembershipRequest[];
+  collectorTransfers: CollectorTransfer[];
 }
 
 import { createClient } from '@supabase/supabase-js';
@@ -173,7 +188,8 @@ const initialData: DatabaseSchema = {
   handovers: [],
   expenses: [],
   programmes: [],
-  membershipRequests: []
+  membershipRequests: [],
+  collectorTransfers: []
 };
 
 const dbRecordId = process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production' 
@@ -273,6 +289,7 @@ export function getDb(): DatabaseSchema {
   if (!dbData.expenses) dbData.expenses = [];
   if (!dbData.programmes) dbData.programmes = [];
   if (!dbData.membershipRequests) dbData.membershipRequests = [];
+  if (!dbData.collectorTransfers) dbData.collectorTransfers = [];
 
   // Cache in process memory
   global._cachedDb = dbData;
