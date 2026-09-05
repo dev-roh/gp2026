@@ -28,8 +28,8 @@
    - **Smart Matching**: Auto-links collection records to newly registered OAuth users and submits auto-membership requests.
    - **Super Admin Console & Suggestions**: Smart merge suggestions and manual member pre-registration.
    - **Public Members Directory**: Searchable directory visible to all verified club members.
-10. **Collector-to-Collector Fund & Entry Transfer Workflow**:
-   - **Scoped Transfer Button**: Collectors can transfer individual collection entries to another collector.
+10. **Collector-to-Collector Single & Bulk Fund/Entry Transfer Workflow**:
+   - **Scoped Transfer**: Collectors can transfer individual or bulk selected collection entries to another collector.
    - **Two-Way Approval**: Recipient collector receives notification & approves transfer before ownership & cash attribution update.
 11. **Central SSO Authentication Gateway Integration**:
    - **CredentialsProvider**: Added NextAuth provider `sso-gateway` for JWT token verification with secret `@@Secure@@sso@secret123`.
