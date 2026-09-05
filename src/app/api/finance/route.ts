@@ -563,6 +563,50 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, item: transfer, message: `Transfer ${decision.toLowerCase()}d successfully.` });
     }
 
+    if (type === 'DELETE_CONTRIBUTIONS') {
+      if (userRole !== 'TREASURER' && userRole !== 'SUPER_ADMIN') {
+        return NextResponse.json({ error: 'Forbidden. Only Treasurer or Super Admin can delete contributions.' }, { status: 403 });
+      }
+
+      const { contributionIds, reason } = data;
+      if (!Array.isArray(contributionIds) || contributionIds.length === 0) {
+        return NextResponse.json({ error: 'At least one contribution ID must be selected.' }, { status: 400 });
+      }
+
+      if (!reason || typeof reason !== 'string' || !reason.trim()) {
+        return NextResponse.json({ error: 'A mandatory reason is required to delete contribution(s).' }, { status: 400 });
+      }
+
+      const idsToDelete = new Set(contributionIds);
+      const initialCount = db.contributions.length;
+      const deletedItems = db.contributions.filter(c => idsToDelete.has(c.id));
+      
+      db.contributions = db.contributions.filter(c => !idsToDelete.has(c.id));
+      const deletedCount = initialCount - db.contributions.length;
+
+      // Log deletion notifications for audit trail
+      if (!db.notifications) db.notifications = [];
+      deletedItems.forEach(item => {
+        db.notifications.push({
+          id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+          recipientEmail: 'luhurenbaiclub@gmail.com',
+          title: 'Contribution Deleted (Audit Trail) 🗑️',
+          message: `Contribution ${item.receiptNo} (₹${item.amount} by ${item.memberName}) deleted by ${session.user?.name || userEmail}. Reason: "${reason.trim()}"`,
+          type: 'CONTRIBUTION_APPROVED',
+          targetId: item.id,
+          isRead: false,
+          date: new Date().toISOString()
+        });
+      });
+
+      await saveDbAsync(db);
+      return NextResponse.json({
+        success: true,
+        deletedCount,
+        message: `Successfully deleted ${deletedCount} contribution(s).`
+      });
+    }
+
     return NextResponse.json({ error: 'Invalid operation type' }, { status: 400 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

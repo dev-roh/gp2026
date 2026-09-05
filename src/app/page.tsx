@@ -23,7 +23,8 @@ import {
   Calendar,
   Video,
   Camera,
-  Play
+  Play,
+  Trash2
 } from 'lucide-react';
 import { AppSettings, User as DbUser, ProgrammeItem } from '@/lib/db';
 
@@ -446,6 +447,71 @@ export default function HomePage() {
       fetchFinanceData();
     } else {
       alert(`Error: ${data.error || 'Failed to merge user'}`);
+    }
+  };
+
+  const [selectedContributionIds, setSelectedContributionIds] = useState<string[]>([]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTargetContribution, setDeleteTargetContribution] = useState<Contribution | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const toggleSelectContribution = (id: string) => {
+    setSelectedContributionIds(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllContributions = () => {
+    if (selectedContributionIds.length === contributions.length) {
+      setSelectedContributionIds([]);
+    } else {
+      setSelectedContributionIds(contributions.map(c => c.id));
+    }
+  };
+
+  const handleConfirmDeleteContributions = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deleteReason || !deleteReason.trim()) {
+      alert('A mandatory reason is required to delete contribution(s).');
+      return;
+    }
+
+    const idsToDelete = deleteTargetContribution
+      ? [deleteTargetContribution.id]
+      : selectedContributionIds;
+
+    if (idsToDelete.length === 0) return;
+
+    try {
+      setIsDeleting(true);
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'DELETE_CONTRIBUTIONS',
+          data: {
+            contributionIds: idsToDelete,
+            reason: deleteReason.trim()
+          }
+        })
+      });
+
+      const result = await res.json();
+      if (res.ok) {
+        alert(`✅ ${result.message}`);
+        setShowDeleteModal(false);
+        setDeleteTargetContribution(null);
+        setSelectedContributionIds([]);
+        setDeleteReason('');
+        fetchFinanceData();
+      } else {
+        alert(`Error: ${result.error || 'Failed to delete contribution(s)'}`);
+      }
+    } catch (err: any) {
+      alert(`Error: ${err.message || 'Failed to delete contribution(s)'}`);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -1815,33 +1881,73 @@ export default function HomePage() {
       {/* TAB CONTENT: Collections */}
       {activeTab === 'contributions' && (
         <div className="bg-white border border-amber-200/80 rounded-3xl p-5 shadow-sm space-y-4">
-          <div className="flex justify-between items-center border-b border-amber-100 pb-3">
-            <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">All Collections Logged</h3>
-            {isCollector && (
-              <button 
-                onClick={() => setShowAddContribution(true)}
-                className="text-xs px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold shadow-xs"
-              >
-                {settings.collectionButtonLabel}
-              </button>
-            )}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-amber-100 pb-3">
+            <div className="flex items-center space-x-2">
+              {(isTreasurer || isSuperAdmin) && contributions.length > 0 && (
+                <input
+                  type="checkbox"
+                  checked={selectedContributionIds.length === contributions.length && contributions.length > 0}
+                  onChange={toggleSelectAllContributions}
+                  className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300"
+                  title="Select all contributions"
+                />
+              )}
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                All Collections Logged ({contributions.length})
+              </h3>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              {(isTreasurer || isSuperAdmin) && selectedContributionIds.length > 0 && (
+                <button
+                  onClick={() => {
+                    setDeleteTargetContribution(null);
+                    setShowDeleteModal(true);
+                  }}
+                  className="text-xs px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-xs flex items-center space-x-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Selected ({selectedContributionIds.length})</span>
+                </button>
+              )}
+
+              {isCollector && (
+                <button 
+                  onClick={() => setShowAddContribution(true)}
+                  className="text-xs px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold shadow-xs"
+                >
+                  {settings.collectionButtonLabel}
+                </button>
+              )}
+            </div>
           </div>
           <div className="divide-y divide-slate-100">
             {contributions.map((c) => (
               <div key={c.id} className="py-3 text-xs flex justify-between items-center">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-extrabold text-slate-900 text-sm">{c.memberName}</span>
-                    <span className="text-[10px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md font-medium border border-slate-200">{c.memberArea}</span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">Receipt: <span className="text-slate-700 font-mono font-bold">{c.receiptNo}</span></p>
-                  <div className="flex gap-2 mt-1 items-center">
-                    <span className="text-xs text-slate-500 font-medium">Collector: {c.collectorName}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase ${c.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                      {c.status}
-                    </span>
+                <div className="flex items-center space-x-3">
+                  {(isTreasurer || isSuperAdmin) && (
+                    <input
+                      type="checkbox"
+                      checked={selectedContributionIds.includes(c.id)}
+                      onChange={() => toggleSelectContribution(c.id)}
+                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 shrink-0"
+                    />
+                  )}
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-extrabold text-slate-900 text-sm">{c.memberName}</span>
+                      <span className="text-[10px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md font-medium border border-slate-200">{c.memberArea}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">Receipt: <span className="text-slate-700 font-mono font-bold">{c.receiptNo}</span></p>
+                    <div className="flex gap-2 mt-1 items-center">
+                      <span className="text-xs text-slate-500 font-medium">Collector: {c.collectorName}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase ${c.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                        {c.status}
+                      </span>
+                    </div>
                   </div>
                 </div>
+
                 <div className="text-right flex items-center space-x-2">
                   <div>
                     <p className="font-black text-emerald-600 text-base">₹{c.amount.toLocaleString()}</p>
@@ -1869,6 +1975,18 @@ export default function HomePage() {
                       title="View Digital Receipt"
                     >
                       <Printer className="w-4 h-4" />
+                    </button>
+                  )}
+                  {(isTreasurer || isSuperAdmin) && (
+                    <button
+                      onClick={() => {
+                        setDeleteTargetContribution(c);
+                        setShowDeleteModal(true);
+                      }}
+                      className="p-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 shadow-xs"
+                      title="Delete Contribution (Mandatory Reason Required)"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>
@@ -2797,6 +2915,65 @@ export default function HomePage() {
                   className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-extrabold shadow-sm hover:from-orange-600 hover:to-amber-600 transition"
                 >
                   Request Transfer
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Contribution Confirmation Modal (With Mandatory Reason) */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-rose-200 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center space-x-2 text-rose-600 border-b border-rose-100 pb-3">
+              <Trash2 className="w-5 h-5" />
+              <h3 className="font-extrabold text-slate-900 text-sm">Delete Contribution Record(s)</h3>
+            </div>
+
+            <div className="bg-rose-50/60 border border-rose-200/80 rounded-2xl p-3 text-xs space-y-1">
+              <p className="font-bold text-rose-900">⚠️ Audit Warning</p>
+              <p className="text-slate-600 font-medium">
+                {deleteTargetContribution
+                  ? `You are about to delete receipt ${deleteTargetContribution.receiptNo} (${deleteTargetContribution.memberName} - ₹${deleteTargetContribution.amount.toLocaleString()}).`
+                  : `You are about to bulk delete ${selectedContributionIds.length} selected contribution record(s).`}
+              </p>
+            </div>
+
+            <form onSubmit={handleConfirmDeleteContributions} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Mandatory Reason for Deletion *
+                </label>
+                <textarea
+                  placeholder="e.g. Duplicate entry logged by mistake / Cash returned to donor..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium text-slate-800 focus:outline-none focus:border-rose-500"
+                  rows={3}
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                  required
+                ></textarea>
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setDeleteTargetContribution(null);
+                    setDeleteReason('');
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition"
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-rose-600 text-white font-extrabold shadow-sm hover:bg-rose-700 transition disabled:opacity-50"
+                  disabled={isDeleting || !deleteReason.trim()}
+                >
+                  {isDeleting ? 'Deleting...' : 'Confirm Delete'}
                 </button>
               </div>
             </form>
