@@ -443,6 +443,35 @@ export default function HomePage() {
     }
   };
 
+  const handleDeleteUser = async (member: { id: string; name: string; email?: string }) => {
+    if (!confirm(`Are you sure you want to permanently delete member "${member.name}"?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'DELETE_USER',
+          userId: member.id,
+          email: member.email
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert(`✅ ${data.message || 'User deleted successfully.'}`);
+        fetchMembersDirectory();
+        fetchFinanceData();
+      } else {
+        alert(`Error: ${data.error || 'Failed to delete user'}`);
+      }
+    } catch (err) {
+      alert('Error sending delete request');
+    }
+  };
+
   const fetchMembersDirectory = async () => {
     try {
       const res = await fetch('/api/admin/users');
@@ -1934,6 +1963,15 @@ export default function HomePage() {
                             title="Edit Member Details"
                           >
                             ✏️ Edit
+                          </button>
+                        )}
+                        {isSuperAdmin && !m.id.startsWith('entry-') && (
+                          <button
+                            onClick={() => handleDeleteUser(m)}
+                            className="px-2 py-0.5 text-[10px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md transition"
+                            title="Delete Member"
+                          >
+                            🗑️ Delete
                           </button>
                         )}
                       </div>

@@ -343,6 +343,59 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, user, message: `Successfully updated member details for ${name.trim()}.` });
     }
 
+    // ACTION 5: Delete User (Super Admin only)
+    if (action === 'DELETE_USER') {
+      const { userId, email } = body;
+      if (!userId && !email) {
+        return NextResponse.json({ error: 'User ID or Email is required for deletion.' }, { status: 400 });
+      }
+
+      const targetUserIndex = db.users.findIndex(u => (userId && u.id === userId) || (email && u.email.toLowerCase() === email.toLowerCase()));
+
+      if (targetUserIndex === -1) {
+        // If it's an unlinked collection entity (entry-...), return clean response
+        if (userId && userId.startsWith('entry-')) {
+          return NextResponse.json({ error: 'Cannot delete raw collection entry entities directly. Manage via contributions.' }, { status: 400 });
+        }
+        return NextResponse.json({ error: 'User record not found.' }, { status: 404 });
+      }
+
+      const targetUser = db.users[targetUserIndex];
+
+      // Prevent deleting root super admin account
+      if (targetUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+        return NextResponse.json({ error: 'Root Super Admin account cannot be deleted.' }, { status: 400 });
+      }
+
+      // Prevent user from deleting themselves
+      if (targetUser.email.toLowerCase() === userEmail?.toLowerCase()) {
+        return NextResponse.json({ error: 'You cannot delete your own account.' }, { status: 400 });
+      }
+
+      // Remove from db.users array
+      db.users.splice(targetUserIndex, 1);
+
+      // Remove role assignment if exists
+      if (db.roleAssignments[targetUser.email.toLowerCase()]) {
+        delete db.roleAssignments[targetUser.email.toLowerCase()];
+      }
+
+      // Unlink memberId from contributions, converting them to standalone entry name records
+      db.contributions.forEach(c => {
+        if (c.memberId === targetUser.id) {
+          c.memberId = `entry-${targetUser.name.toLowerCase().replace(/\s+/g, '-')}`;
+          if (!c.memberName) c.memberName = targetUser.name;
+          if (!c.memberArea && targetUser.area) c.memberArea = targetUser.area;
+        }
+      });
+
+      // Clean up pending membership requests for this user email
+      db.membershipRequests = db.membershipRequests.filter(r => r.userEmail.toLowerCase() !== targetUser.email.toLowerCase());
+
+      await saveDbAsync(db);
+      return NextResponse.json({ success: true, message: `Member "${targetUser.name}" (${targetUser.email}) was successfully deleted.` });
+    }
+
     return NextResponse.json({ error: 'Invalid action provided.' }, { status: 400 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
