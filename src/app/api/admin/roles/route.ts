@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getDbAsync, saveDbAsync, getUserRole } from '@/lib/db';
+import { getDbAsync, saveDbAsync, getUserRole, logUserActivity } from '@/lib/db';
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -66,6 +66,13 @@ export async function POST(req: Request) {
     });
 
     await saveDbAsync(db);
+    await logUserActivity(
+      superAdminEmail || 'luhurenbaiclub@gmail.com',
+      session?.user?.name || 'Super Admin',
+      'SUPER_ADMIN',
+      'ASSIGN_ROLE',
+      `Assigned ${newRole} to ${emailsToProcess.join(', ')}`
+    );
     return NextResponse.json({ success: true, count: addedCount, message: `Successfully assigned ${newRole} role to ${addedCount} user email(s).` });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

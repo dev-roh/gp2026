@@ -73,6 +73,17 @@ interface Contribution {
   isPrivate?: boolean;
 }
 
+interface UserActivity {
+  id: string;
+  userEmail: string;
+  userName: string;
+  userRole: string;
+  action: string;
+  details?: string;
+  ipAddress?: string;
+  timestamp: string;
+}
+
 interface CollectorTransfer {
   id: string;
   contributionId?: string;
@@ -276,7 +287,8 @@ export default function HomePage() {
     }
   }, []);
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'programmes' | 'collectors' | 'contributions' | 'expenses' | 'reimbursements' | 'approvals' | 'admin' | 'branding'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'programmes' | 'collectors' | 'contributions' | 'expenses' | 'reimbursements' | 'approvals' | 'admin' | 'branding' | 'activity'>('overview');
+  const [userActivities, setUserActivities] = useState<UserActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [collectorBalances, setCollectorBalances] = useState<CollectorBalance[]>([]);
@@ -671,7 +683,7 @@ export default function HomePage() {
       setCollectorBalances(data.collectorBalances);
       setContributions(data.latestContributions);
       setPendingApprovalsForMe(data.pendingApprovalsForMe || []);
-      setPendingCollectorTransfersForMe(data.pendingCollectorTransfersForMe || []);
+      if (data.userActivities) setUserActivities(data.userActivities);
       setCollectorTransfers(data.collectorTransfers || []);
       setTotalPendingActionCount(data.totalPendingActionCount || 0);
       setExpenses(data.latestExpenses);
@@ -1439,6 +1451,12 @@ export default function HomePage() {
               className={`flex-1 py-2 px-3.5 rounded-xl text-center whitespace-nowrap transition ${activeTab === 'branding' ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
             >
               Branding
+            </button>
+            <button 
+              onClick={() => setActiveTab('activity')} 
+              className={`flex-1 py-2 px-3.5 rounded-xl text-center whitespace-nowrap transition flex items-center justify-center space-x-1 ${activeTab === 'activity' ? 'bg-gradient-to-r from-slate-800 to-slate-950 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+            >
+              <span>📜 Activity Logs</span>
             </button>
           </>
         )}
@@ -2556,6 +2574,61 @@ export default function HomePage() {
               </p>
             )}
           </form>
+        </div>
+      )}
+
+      {/* TAB CONTENT: Super Admin User Activity Audit Logs */}
+      {activeTab === 'activity' && isSuperAdmin && (
+        <div className="bg-white border border-amber-200/80 rounded-3xl p-5 shadow-sm space-y-4 text-xs">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-amber-100 pb-3">
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <span>📜 System User Activity & Audit Logs ({userActivities.length})</span>
+              </h3>
+              <p className="text-[11px] text-slate-500 font-medium">Real-time audit trail of user logins, role modifications, and contributions</p>
+            </div>
+            <button
+              onClick={() => fetchFinanceData()}
+              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-200 transition"
+            >
+              🔄 Refresh Logs
+            </button>
+          </div>
+
+          {userActivities.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 font-medium bg-slate-50 rounded-2xl border border-slate-200">
+              No activity logs recorded yet. Action events will appear here automatically.
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto pr-1 space-y-2">
+              {userActivities.map((act) => (
+                <div key={act.id} className="pt-2.5 pb-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-extrabold text-slate-900 text-xs">{act.userName}</span>
+                      <span className="text-[10px] text-slate-500 font-mono">({act.userEmail})</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase ${
+                        act.userRole === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-800 border border-purple-200' :
+                        act.userRole === 'COLLECTOR' ? 'bg-orange-100 text-orange-800 border border-orange-200' :
+                        'bg-slate-100 text-slate-700 border border-slate-200'
+                      }`}>
+                        {act.userRole}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-700 font-medium">
+                      <span className="font-bold text-orange-600">[{act.action}]</span> {act.details || 'N/A'}
+                    </p>
+                  </div>
+
+                  <div className="text-left sm:text-right shrink-0">
+                    <span className="text-[10px] text-slate-400 font-mono block">
+                      {new Date(act.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'medium' })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

@@ -133,6 +133,17 @@ export interface ProgrammeItem {
   createdAt: string;
 }
 
+export interface UserActivity {
+  id: string;
+  userEmail: string;
+  userName: string;
+  userRole: string;
+  action: string;
+  details?: string;
+  ipAddress?: string;
+  timestamp: string;
+}
+
 export interface DatabaseSchema {
   settings: AppSettings;
   users: User[];
@@ -144,6 +155,7 @@ export interface DatabaseSchema {
   programmes: ProgrammeItem[];
   membershipRequests: MembershipRequest[];
   collectorTransfers: CollectorTransfer[];
+  userActivities?: UserActivity[];
 }
 
 import { createClient } from '@supabase/supabase-js';
@@ -207,7 +219,7 @@ const dbRecordId = process.env.VERCEL_ENV === 'production' || process.env.NODE_E
 export async function getDbAsync(): Promise<DatabaseSchema> {
   if (supabase) {
     try {
-      const [
+        const [
         settingsRes,
         usersRes,
         rolesRes,
@@ -217,7 +229,8 @@ export async function getDbAsync(): Promise<DatabaseSchema> {
         transfersRes,
         programmesRes,
         mreqRes,
-        notifRes
+        notifRes,
+        activityRes
       ] = await Promise.all([
         supabase.from('app_settings').select('*').single(),
         supabase.from('users').select('*'),
@@ -228,7 +241,8 @@ export async function getDbAsync(): Promise<DatabaseSchema> {
         supabase.from('collector_transfers').select('*'),
         supabase.from('programmes').select('*'),
         supabase.from('membership_requests').select('*'),
-        supabase.from('notifications').select('*')
+        supabase.from('notifications').select('*'),
+        supabase.from('user_activities').select('*').order('timestamp', { ascending: false }).limit(100)
       ]);
 
       if (!usersRes.error && usersRes.data) {
@@ -362,6 +376,17 @@ export async function getDbAsync(): Promise<DatabaseSchema> {
           date: n.date
         }));
 
+        const userActivities: UserActivity[] = (activityRes.data || []).map(a => ({
+          id: a.id,
+          userEmail: a.user_email,
+          userName: a.user_name,
+          userRole: a.user_role,
+          action: a.action,
+          details: a.details || undefined,
+          ipAddress: a.ip_address || undefined,
+          timestamp: a.timestamp
+        }));
+
         const dbSchema: DatabaseSchema = {
           settings,
           users,
@@ -372,7 +397,8 @@ export async function getDbAsync(): Promise<DatabaseSchema> {
           collectorTransfers,
           programmes,
           membershipRequests,
-          notifications
+          notifications,
+          userActivities
         };
 
         global._cachedDb = dbSchema;
@@ -562,9 +588,67 @@ export async function saveDbAsync(data: DatabaseSchema): Promise<void> {
         }));
         await supabase.from('notifications').upsert(notifPayload);
       }
+
+      // 11. Sync User Activities
+      if (Array.isArray(data.userActivities) && data.userActivities.length > 0) {
+        const activityPayload = data.userActivities.map(a => ({
+          id: a.id,
+          user_email: a.userEmail.toLowerCase(),
+          user_name: a.userName,
+          user_role: a.userRole,
+          action: a.action,
+          details: a.details || null,
+          ip_address: a.ipAddress || null,
+          timestamp: a.timestamp || new Date().toISOString()
+        }));
+        await supabase.from('user_activities').upsert(activityPayload);
+      }
     } catch (err) {
       console.error('Supabase relational save error:', err);
     }
+  }
+}
+
+export async function logUserActivity(
+  userEmail: string,
+  userName: string,
+  userRole: string,
+  action: string,
+  details?: string,
+  ipAddress?: string
+): Promise<void> {
+  try {
+    const activityItem: UserActivity = {
+      id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      userEmail: userEmail.toLowerCase(),
+      userName,
+      userRole,
+      action,
+      details,
+      ipAddress,
+      timestamp: new Date().toISOString()
+    };
+
+    if (supabase) {
+      await supabase.from('user_activities').insert({
+        id: activityItem.id,
+        user_email: activityItem.userEmail,
+        user_name: activityItem.userName,
+        user_role: activityItem.userRole,
+        action: activityItem.action,
+        details: activityItem.details || null,
+        ip_address: activityItem.ipAddress || null,
+        timestamp: activityItem.timestamp
+      });
+    }
+
+    const db = getDb();
+    if (!db.userActivities) db.userActivities = [];
+    db.userActivities.unshift(activityItem);
+    if (db.userActivities.length > 500) db.userActivities = db.userActivities.slice(0, 500);
+    saveDb(db);
+  } catch (err) {
+    console.error('Failed to log user activity:', err);
   }
 }
 

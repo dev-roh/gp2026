@@ -2,7 +2,7 @@ import NextAuth, { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import jwt from 'jsonwebtoken';
-import { getUserRole, registerOrUpdateUserAsync } from '@/lib/db';
+import { getUserRole, registerOrUpdateUserAsync, logUserActivity } from '@/lib/db';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -30,6 +30,9 @@ export const authOptions: NextAuthOptions = {
               decoded.picture
             );
 
+            const role = getUserRole(decoded.email);
+            await logUserActivity(decoded.email, decoded.name || decoded.email.split("@")[0], role, 'USER_LOGIN_SSO', 'Logged in via Central SSO Gateway');
+
             return {
               id: decoded.sub || decoded.email,
               name: decoded.name || decoded.email.split("@")[0],
@@ -45,9 +48,17 @@ export const authOptions: NextAuthOptions = {
     })
   ],
   callbacks: {
-    async signIn({ user }) {
+    async signIn({ user, account }) {
       if (user?.email && user?.name) {
         await registerOrUpdateUserAsync(user.name, user.email, user.image || undefined);
+        const role = getUserRole(user.email);
+        await logUserActivity(
+          user.email,
+          user.name,
+          role,
+          'USER_LOGIN',
+          `Logged in via ${account?.provider || 'Google OAuth'}`
+        );
       }
       return true;
     },

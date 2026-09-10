@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getDbAsync, saveDbAsync, getUserRole, registerOrUpdateUser } from '@/lib/db';
+import { getDbAsync, saveDbAsync, getUserRole, registerOrUpdateUser, logUserActivity } from '@/lib/db';
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -130,7 +130,8 @@ export async function GET(req: Request) {
     handovers: db.handovers.slice().reverse(),
     programmes: (db.programmes || []).slice().reverse(),
     membershipRequests: (db.membershipRequests || []).slice().reverse(),
-    users: db.users
+    users: db.users,
+    userActivities: userRole === 'SUPER_ADMIN' ? (db.userActivities || []).slice(0, 100) : []
   });
 }
 
@@ -201,6 +202,13 @@ export async function POST(req: Request) {
       }
 
       await saveDbAsync(db);
+      await logUserActivity(
+        userEmail,
+        session?.user?.name || userEmail,
+        userRole,
+        'ADD_CONTRIBUTION',
+        `Recorded ₹${data.amount} for ${data.memberName} (${data.paymentMode})`
+      );
       return NextResponse.json({ success: true, item: newContribution, status });
     }
 
