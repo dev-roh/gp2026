@@ -160,3 +160,17 @@ model Notification {
 
   @@map("notifications")
 }
+
+model UserActivity {
+  id        String   @id
+  userEmail String   @map("user_email")
+  userName  String   @map("user_name")
+  userRole  String   @map("user_role")
+  action    String
+  details   String?
+  ipAddress String?  @map("ip_address")
+  timestamp DateTime @default(now())
+
+  @@map("user_activities")
+}
+

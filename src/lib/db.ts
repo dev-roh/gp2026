@@ -600,17 +600,21 @@ export async function saveDbAsync(data: DatabaseSchema): Promise<void> {
 
       // 11. Sync User Activities
       if (Array.isArray(data.userActivities) && data.userActivities.length > 0) {
-        const activityPayload = data.userActivities.map(a => ({
-          id: a.id,
-          user_email: a.userEmail.toLowerCase(),
-          user_name: a.userName,
-          user_role: a.userRole,
-          action: a.action,
-          details: a.details || null,
-          ip_address: a.ipAddress || null,
-          timestamp: a.timestamp || new Date().toISOString()
-        }));
-        await supabase.from('user_activities').upsert(activityPayload);
+        try {
+          const activityPayload = data.userActivities.map(a => ({
+            id: a.id,
+            user_email: a.userEmail.toLowerCase(),
+            user_name: a.userName,
+            user_role: a.userRole,
+            action: a.action,
+            details: a.details || null,
+            ip_address: a.ipAddress || null,
+            timestamp: a.timestamp || new Date().toISOString()
+          }));
+          await supabase.from('user_activities').upsert(activityPayload);
+        } catch (e) {
+          // Gracefully handle if user_activities table is pending DDL creation
+        }
       }
     } catch (err) {
       console.error('Supabase relational save error:', err);
