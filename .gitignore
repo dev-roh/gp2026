@@ -19,3 +19,5 @@
 # IDE & OS
 .DS_Store
 *.pem
+.vercel
+.env*

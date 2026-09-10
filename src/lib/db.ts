@@ -207,25 +207,179 @@ const dbRecordId = process.env.VERCEL_ENV === 'production' || process.env.NODE_E
 export async function getDbAsync(): Promise<DatabaseSchema> {
   if (supabase) {
     try {
-      const { data, error } = await supabase
-        .from('app_db')
-        .select('data')
-        .eq('id', dbRecordId)
-        .single();
-      
-      if (!error && data?.data) {
-        global._cachedDb = data.data as DatabaseSchema;
-        return global._cachedDb;
-      }
+      const [
+        settingsRes,
+        usersRes,
+        rolesRes,
+        contribsRes,
+        expensesRes,
+        handoversRes,
+        transfersRes,
+        programmesRes,
+        mreqRes,
+        notifRes
+      ] = await Promise.all([
+        supabase.from('app_settings').select('*').single(),
+        supabase.from('users').select('*'),
+        supabase.from('role_assignments').select('*'),
+        supabase.from('contributions').select('*'),
+        supabase.from('expenses').select('*'),
+        supabase.from('handovers').select('*'),
+        supabase.from('collector_transfers').select('*'),
+        supabase.from('programmes').select('*'),
+        supabase.from('membership_requests').select('*'),
+        supabase.from('notifications').select('*')
+      ]);
 
-      // If table missing or row missing, seed database to Supabase
-      if (error && (error.code === 'PGRST116' || error.code === 'PGRST205' || error.message?.includes('schema cache'))) {
-        const localData = getDb();
-        await saveDbAsync(localData);
-        return localData;
+      if (!usersRes.error && usersRes.data) {
+        const settings = settingsRes.data ? {
+          appTitle: settingsRes.data.app_title,
+          subTitle: settingsRes.data.sub_title,
+          logoUrl: settingsRes.data.logo_url,
+          themeColor: settingsRes.data.theme_color,
+          targetGoalAmount: Number(settingsRes.data.target_goal_amount),
+          targetGoalLabel: settingsRes.data.target_goal_label,
+          collectionButtonLabel: settingsRes.data.collection_button_label,
+          spendButtonLabel: settingsRes.data.spend_button_label,
+          handoverButtonLabel: settingsRes.data.handover_button_label,
+          areaOptions: settingsRes.data.area_options || defaultSettings.areaOptions
+        } as AppSettings : defaultSettings;
+
+        const users: User[] = (usersRes.data || []).map(u => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          area: u.area || undefined,
+          phone: u.phone || undefined,
+          image: u.image || undefined,
+          isManual: u.is_manual,
+          createdAt: u.created_at
+        }));
+
+        const roleAssignments: Record<string, UserRoleAssignment> = {};
+        (rolesRes.data || []).forEach(r => {
+          roleAssignments[r.email.toLowerCase()] = {
+            email: r.email,
+            role: r.role,
+            assignedBy: r.assigned_by,
+            updatedAt: r.updated_at
+          };
+        });
+
+        const contributions: Contribution[] = (contribsRes.data || []).map(c => ({
+          id: c.id,
+          receiptNo: c.receipt_no,
+          amount: Number(c.amount),
+          paymentMode: c.payment_mode,
+          date: c.date,
+          memberId: c.member_id || '',
+          memberName: c.member_name,
+          memberArea: c.member_area,
+          collectorId: c.collector_id,
+          collectorName: c.collector_name,
+          status: c.status,
+          approverEmail: c.approver_email || undefined,
+          isSelfContribution: c.is_self_contribution,
+          isPrivate: c.is_private,
+          note: c.note || undefined
+        }));
+
+        const expenses: Expense[] = (expensesRes.data || []).map(e => ({
+          id: e.id,
+          title: e.title,
+          category: e.category,
+          amount: Number(e.amount),
+          isOutofPocket: e.is_out_of_pocket,
+          isReimbursed: e.is_reimbursed,
+          paidById: e.paid_by_email,
+          paidByName: e.paid_by_name,
+          receiptUrl: e.receipt_url || undefined,
+          date: e.date,
+          createdAt: e.created_at
+        }));
+
+        const handovers: Handover[] = (handoversRes.data || []).map(h => ({
+          id: h.id,
+          amount: Number(h.amount),
+          collectorId: h.collector_id,
+          collectorName: h.collector_name,
+          treasurerId: h.treasurer_id || undefined,
+          treasurerName: h.treasurer_name || undefined,
+          status: h.status,
+          notes: h.notes || undefined,
+          date: h.date,
+          createdAt: h.created_at
+        }));
+
+        const collectorTransfers: CollectorTransfer[] = (transfersRes.data || []).map(t => ({
+          id: t.id,
+          contributionId: t.contribution_id || undefined,
+          contributionIds: t.contribution_ids || undefined,
+          amount: Number(t.amount),
+          fromCollectorEmail: t.from_collector_email,
+          fromCollectorName: t.from_collector_name,
+          toCollectorEmail: t.to_collector_email,
+          toCollectorName: t.to_collector_name,
+          status: t.status,
+          notes: t.notes || undefined,
+          createdAt: t.created_at,
+          decidedAt: t.decided_at || undefined
+        }));
+
+        const programmes: ProgrammeItem[] = (programmesRes.data || []).map(p => ({
+          id: p.id,
+          title: p.title,
+          description: p.description || undefined,
+          dateTime: p.date_time,
+          location: p.location || undefined,
+          photoUrls: p.photo_urls || [],
+          videoUrls: p.video_urls || [],
+          createdBy: p.created_by,
+          createdAt: p.created_at
+        }));
+
+        const membershipRequests: MembershipRequest[] = (mreqRes.data || []).map(m => ({
+          id: m.id,
+          userName: m.user_name,
+          userEmail: m.user_email,
+          userArea: m.user_area || undefined,
+          requestedRole: m.requested_role,
+          status: m.status,
+          createdAt: m.created_at,
+          decidedBy: m.decided_by || undefined,
+          decidedAt: m.decided_at || undefined
+        }));
+
+        const notifications: NotificationItem[] = (notifRes.data || []).map(n => ({
+          id: n.id,
+          recipientEmail: n.recipient_email,
+          title: n.title,
+          message: n.message,
+          type: n.type,
+          targetId: n.target_id || '',
+          isRead: n.is_read,
+          date: n.date
+        }));
+
+        const dbSchema: DatabaseSchema = {
+          settings,
+          users,
+          roleAssignments,
+          contributions,
+          expenses,
+          handovers,
+          collectorTransfers,
+          programmes,
+          membershipRequests,
+          notifications
+        };
+
+        global._cachedDb = dbSchema;
+        return dbSchema;
       }
     } catch (err) {
-      console.error('Supabase fetch error:', err);
+      console.error('Supabase relational fetch error:', err);
     }
   }
 
@@ -238,15 +392,178 @@ export async function saveDbAsync(data: DatabaseSchema): Promise<void> {
 
   if (supabase) {
     try {
-      const { error } = await supabase
-        .from('app_db')
-        .upsert({ id: dbRecordId, data, updated_at: new Date().toISOString() });
-      
-      if (error) {
-        console.error('Supabase save error details:', error.message, error.code, error.details);
+      // 1. Sync Settings
+      if (data.settings) {
+        await supabase.from('app_settings').upsert({
+          id: 'default',
+          app_title: data.settings.appTitle,
+          sub_title: data.settings.subTitle,
+          logo_url: data.settings.logoUrl || null,
+          theme_color: data.settings.themeColor,
+          target_goal_amount: data.settings.targetGoalAmount,
+          target_goal_label: data.settings.targetGoalLabel,
+          collection_button_label: data.settings.collectionButtonLabel,
+          spend_button_label: data.settings.spendButtonLabel,
+          handover_button_label: data.settings.handoverButtonLabel,
+          area_options: data.settings.areaOptions,
+          updated_at: new Date().toISOString()
+        });
+      }
+
+      // 2. Sync Users
+      if (Array.isArray(data.users) && data.users.length > 0) {
+        const usersPayload = data.users.map(u => ({
+          id: u.id,
+          name: u.name,
+          email: u.email.toLowerCase(),
+          role: u.role,
+          area: u.area || null,
+          phone: u.phone || null,
+          image: u.image || null,
+          is_manual: Boolean(u.isManual),
+          created_at: u.createdAt || new Date().toISOString()
+        }));
+        await supabase.from('users').upsert(usersPayload);
+      }
+
+      // 3. Sync Role Assignments
+      if (data.roleAssignments) {
+        const rolesPayload = Object.values(data.roleAssignments).map(r => ({
+          email: r.email.toLowerCase(),
+          role: r.role,
+          assigned_by: r.assignedBy,
+          updated_at: r.updatedAt || new Date().toISOString()
+        }));
+        if (rolesPayload.length > 0) {
+          await supabase.from('role_assignments').upsert(rolesPayload);
+        }
+      }
+
+      // 4. Sync Contributions
+      if (Array.isArray(data.contributions) && data.contributions.length > 0) {
+        const contribsPayload = data.contributions.map(c => ({
+          id: c.id,
+          receipt_no: c.receiptNo,
+          amount: c.amount,
+          payment_mode: c.paymentMode,
+          date: c.date || new Date().toISOString(),
+          member_id: c.memberId || null,
+          member_name: c.memberName,
+          member_area: c.memberArea || 'General Area',
+          collector_id: c.collectorId,
+          collector_name: c.collectorName,
+          status: c.status,
+          approver_email: c.approverEmail || null,
+          is_self_contribution: Boolean(c.isSelfContribution),
+          is_private: Boolean(c.isPrivate),
+          note: c.note || null,
+          created_at: c.date || new Date().toISOString()
+        }));
+        await supabase.from('contributions').upsert(contribsPayload);
+      }
+
+      // 5. Sync Expenses
+      if (Array.isArray(data.expenses) && data.expenses.length > 0) {
+        const expPayload = data.expenses.map(e => ({
+          id: e.id,
+          title: e.title,
+          category: e.category,
+          amount: e.amount,
+          is_out_of_pocket: Boolean(e.isOutofPocket),
+          is_reimbursed: Boolean(e.isReimbursed),
+          paid_by_email: e.paidById,
+          paid_by_name: e.paidByName,
+          receipt_url: e.receiptUrl || null,
+          date: e.date || new Date().toISOString(),
+          created_at: e.date || new Date().toISOString()
+        }));
+        await supabase.from('expenses').upsert(expPayload);
+      }
+
+      // 6. Sync Handovers
+      if (Array.isArray(data.handovers) && data.handovers.length > 0) {
+        const handPayload = data.handovers.map(h => ({
+          id: h.id,
+          amount: h.amount,
+          collector_id: h.collectorId,
+          collector_name: h.collectorName,
+          treasurer_id: h.treasurerId || null,
+          treasurer_name: h.treasurerName || null,
+          status: h.status,
+          notes: h.notes || null,
+          date: h.date || new Date().toISOString(),
+          created_at: h.date || new Date().toISOString()
+        }));
+        await supabase.from('handovers').upsert(handPayload);
+      }
+
+      // 7. Sync Collector Transfers
+      if (Array.isArray(data.collectorTransfers) && data.collectorTransfers.length > 0) {
+        const transferPayload = data.collectorTransfers.map(t => ({
+          id: t.id,
+          contribution_id: t.contributionId || null,
+          contribution_ids: t.contributionIds || [],
+          amount: t.amount,
+          from_collector_email: t.fromCollectorEmail,
+          from_collector_name: t.fromCollectorName,
+          to_collector_email: t.toCollectorEmail,
+          to_collector_name: t.toCollectorName,
+          status: t.status,
+          notes: t.notes || null,
+          created_at: t.createdAt || new Date().toISOString(),
+          decided_at: t.decidedAt || null
+        }));
+        await supabase.from('collector_transfers').upsert(transferPayload);
+      }
+
+      // 8. Sync Programmes
+      if (Array.isArray(data.programmes) && data.programmes.length > 0) {
+        const progPayload = data.programmes.map(p => ({
+          id: p.id,
+          title: p.title,
+          description: p.description || null,
+          date_time: p.dateTime || new Date().toISOString(),
+          location: p.location || null,
+          photo_urls: p.photoUrl ? [p.photoUrl] : [],
+          video_urls: p.embedUrl ? [p.embedUrl] : [],
+          created_by: 'Super Admin',
+          created_at: p.createdAt || new Date().toISOString()
+        }));
+        await supabase.from('programmes').upsert(progPayload);
+      }
+
+      // 9. Sync Membership Requests
+      if (Array.isArray(data.membershipRequests) && data.membershipRequests.length > 0) {
+        const mreqPayload = data.membershipRequests.map(r => ({
+          id: r.id,
+          user_name: r.userName,
+          user_email: r.userEmail,
+          user_area: r.userArea || null,
+          requested_role: r.requestedRole,
+          status: r.status,
+          decided_by: r.decidedBy || null,
+          created_at: r.createdAt || new Date().toISOString(),
+          decided_at: r.decidedAt || null
+        }));
+        await supabase.from('membership_requests').upsert(mreqPayload);
+      }
+
+      // 10. Sync Notifications
+      if (Array.isArray(data.notifications) && data.notifications.length > 0) {
+        const notifPayload = data.notifications.map(n => ({
+          id: n.id,
+          recipient_email: n.recipientEmail,
+          title: n.title,
+          message: n.message,
+          type: n.type,
+          target_id: n.targetId || null,
+          is_read: Boolean(n.isRead),
+          date: n.date || new Date().toISOString()
+        }));
+        await supabase.from('notifications').upsert(notifPayload);
       }
     } catch (err) {
-      console.error('Supabase save error:', err);
+      console.error('Supabase relational save error:', err);
     }
   }
 }

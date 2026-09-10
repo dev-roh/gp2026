@@ -3,101 +3,158 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-enum Role {
-  ADMIN
-  TREASURER
-  COLLECTOR
-  MEMBER
-}
+model AppSettings {
+  id                    String   @id @default("default")
+  appTitle              String   @map("app_title")
+  subTitle              String   @map("sub_title")
+  logoUrl               String?  @map("logo_url")
+  themeColor            String   @default("AMBER_ORANGE") @map("theme_color")
+  targetGoalAmount      Float    @default(200000) @map("target_goal_amount")
+  targetGoalLabel       String   @default("Target Fund Goal") @map("target_goal_label")
+  collectionButtonLabel String   @default("+ Collection") @map("collection_button_label")
+  spendButtonLabel      String   @default("+ Spend / Bill") @map("spend_button_label")
+  handoverButtonLabel   String   @default("Handover Cash") @map("handover_button_label")
+  areaOptions           Json     @map("area_options")
+  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at")
 
-enum PaymentMode {
-  CASH
-  UPI
-  BANK_TRANSFER
-}
-
-enum HandoverStatus {
-  PENDING
-  APPROVED
-  REJECTED
+  @@map("app_settings")
 }
 
 model User {
-  id            String          @id @default(uuid())
-  name          String
-  email         String          @unique
-  image         String?
-  role          Role            @default(MEMBER)
-  flatNo        String?
-  phone         String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id              String           @id
+  name            String
+  email           String           @unique
+  role            String           @default("MEMBER")
+  area            String?
+  phone           String?
+  image           String?
+  isManual        Boolean          @default(false) @map("is_manual")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  roleAssignment  RoleAssignment?
 
-  collections   Contribution[]  @relation("CollectorRelation")
-  myContributions Contribution[] @relation("MemberRelation")
-  handoversSent Handover[]      @relation("CollectorHandover")
-  handoversReceived Handover[]  @relation("TreasurerHandover")
-  expenses      Expense[]       @relation("PaidByRelation")
+  @@map("users")
 }
 
-model MemberTarget {
-  id            String    @id @default(uuid())
-  name          String
-  flatNo        String    @unique
-  phone         String?
-  targetAmount  Float     @default(5000)
-  createdAt     DateTime  @default(now())
+model RoleAssignment {
+  email      String   @id
+  role       String
+  assignedBy String   @map("assigned_by")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+  user       User?    @relation(fields: [email], references: [email], onDelete: Cascade)
+
+  @@map("role_assignments")
 }
 
 model Contribution {
-  id            String      @id @default(uuid())
-  amount        Float
-  paymentMode   PaymentMode
-  receiptNo     String      @unique
-  note          String?
-  date          DateTime    @default(now())
-  
-  memberId      String?
-  member        User?       @relation("MemberRelation", fields: [memberId], references: [id])
-  
-  collectorId   String
-  collector     User        @relation("CollectorRelation", fields: [collectorId], references: [id])
+  id                  String   @id
+  receiptNo           String   @unique @map("receipt_no")
+  amount              Float
+  paymentMode         String   @map("payment_mode")
+  date                DateTime @default(now())
+  memberId            String?  @map("member_id")
+  memberName          String   @map("member_name")
+  memberArea          String   @map("member_area")
+  collectorId         String   @map("collector_id")
+  collectorName       String   @map("collector_name")
+  status              String   @default("APPROVED")
+  approverEmail       String?  @map("approver_email")
+  isSelfContribution  Boolean  @default(false) @map("is_self_contribution")
+  isPrivate           Boolean  @default(false) @map("is_private")
+  note                String?
+  createdAt           DateTime @default(now()) @map("created_at")
 
-  createdAt     DateTime    @default(now())
-}
-
-model Handover {
-  id            String         @id @default(uuid())
-  amount        Float
-  status        HandoverStatus @default(PENDING)
-  notes         String?
-  date          DateTime       @default(now())
-
-  collectorId   String
-  collector     User           @relation("CollectorHandover", fields: [collectorId], references: [id])
-
-  treasurerId   String?
-  treasurer     User?          @relation("TreasurerHandover", fields: [treasurerId], references: [id])
-
-  createdAt     DateTime       @default(now())
+  @@map("contributions")
 }
 
 model Expense {
-  id            String   @id @default(uuid())
+  id            String   @id
   title         String
   category      String
   amount        Float
-  isOutofPocket Boolean  @default(false)
-  isReimbursed  Boolean  @default(false)
-  receiptUrl    String?
+  isOutofPocket Boolean  @default(true) @map("is_out_of_pocket")
+  isReimbursed  Boolean  @default(false) @map("is_reimbursed")
+  paidByEmail   String   @map("paid_by_email")
+  paidByName    String   @map("paid_by_name")
+  receiptUrl    String?  @map("receipt_url")
   date          DateTime @default(now())
+  createdAt     DateTime @default(now()) @map("created_at")
 
-  paidById      String
-  paidBy        User     @relation("PaidByRelation", fields: [paidById], references: [id])
+  @@map("expenses")
+}
 
-  createdAt     DateTime @default(now())
+model Handover {
+  id            String   @id
+  amount        Float
+  collectorId   String   @map("collector_id")
+  collectorName String   @map("collector_name")
+  treasurerId   String?  @map("treasurer_id")
+  treasurerName String?  @map("treasurer_name")
+  status        String   @default("PENDING")
+  notes         String?
+  date          DateTime @default(now())
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("handovers")
+}
+
+model CollectorTransfer {
+  id                 String    @id
+  contributionId     String?   @map("contribution_id")
+  contributionIds    Json?     @map("contribution_ids")
+  amount             Float
+  fromCollectorEmail String    @map("from_collector_email")
+  fromCollectorName  String    @map("from_collector_name")
+  toCollectorEmail   String    @map("to_collector_email")
+  toCollectorName    String    @map("to_collector_name")
+  status             String    @default("PENDING")
+  notes              String?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  decidedAt          DateTime? @map("decided_at")
+
+  @@map("collector_transfers")
+}
+
+model Programme {
+  id          String   @id
+  title       String
+  description String?
+  dateTime    DateTime @map("date_time")
+  location    String?
+  photoUrls   Json?    @map("photo_urls")
+  videoUrls   Json?    @map("video_urls")
+  createdBy   String   @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("programmes")
+}
+
+model MembershipRequest {
+  id            String    @id
+  userName      String    @map("user_name")
+  userEmail     String    @map("user_email")
+  userArea      String?   @map("user_area")
+  requestedRole String    @default("MEMBER") @map("requested_role")
+  status        String    @default("PENDING")
+  decidedBy     String?   @map("decided_by")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  decidedAt     DateTime? @map("decided_at")
+
+  @@map("membership_requests")
+}
+
+model Notification {
+  id             String   @id
+  recipientEmail String   @map("recipient_email")
+  title          String
+  message        String
+  type           String
+  targetId       String?  @map("target_id")
+  isRead         Boolean  @default(false) @map("is_read")
+  date           DateTime @default(now())
+
+  @@map("notifications")
 }
