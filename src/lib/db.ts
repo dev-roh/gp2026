@@ -341,18 +341,23 @@ export async function getDbAsync(): Promise<DatabaseSchema> {
           decidedAt: t.decided_at || undefined
         }));
 
-        const programmes: ProgrammeItem[] = (programmesRes.data || []).map(p => ({
-          id: p.id,
-          title: p.title,
-          description: p.description || undefined,
-          dateTime: p.date_time,
-          location: p.location || undefined,
-          photoUrl: p.photo_url || (Array.isArray(p.photo_urls) ? p.photo_urls[0] : undefined),
-          mediaType: p.media_type || (p.embed_url ? 'YOUTUBE' : 'IMAGE'),
-          embedUrl: p.embed_url || (Array.isArray(p.video_urls) ? p.video_urls[0] : undefined),
-          videoOrientation: p.video_orientation || 'PORTRAIT',
-          createdAt: p.created_at
-        }));
+        const programmes: ProgrammeItem[] = (programmesRes.data || []).map(p => {
+          const embedUrl = p.embed_url || (Array.isArray(p.video_urls) && p.video_urls.length > 0 ? p.video_urls[0] : undefined);
+          const photoUrl = p.photo_url || (Array.isArray(p.photo_urls) && p.photo_urls.length > 0 ? p.photo_urls[0] : undefined);
+          const mediaType = p.media_type || (embedUrl ? 'YOUTUBE' : (photoUrl ? 'IMAGE' : undefined));
+          return {
+            id: p.id,
+            title: p.title,
+            description: p.description || undefined,
+            dateTime: p.date_time,
+            location: p.location || undefined,
+            photoUrl,
+            mediaType,
+            embedUrl,
+            videoOrientation: p.video_orientation || 'PORTRAIT',
+            createdAt: p.created_at
+          };
+        });
 
         const membershipRequests: MembershipRequest[] = (mreqRes.data || []).map(m => ({
           id: m.id,
