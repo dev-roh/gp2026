@@ -347,9 +347,10 @@ export async function getDbAsync(): Promise<DatabaseSchema> {
           description: p.description || undefined,
           dateTime: p.date_time,
           location: p.location || undefined,
-          photoUrls: p.photo_urls || [],
-          videoUrls: p.video_urls || [],
-          createdBy: p.created_by,
+          photoUrl: p.photo_url || (Array.isArray(p.photo_urls) ? p.photo_urls[0] : undefined),
+          mediaType: p.media_type || (p.embed_url ? 'YOUTUBE' : 'IMAGE'),
+          embedUrl: p.embed_url || (Array.isArray(p.video_urls) ? p.video_urls[0] : undefined),
+          videoOrientation: p.video_orientation || 'PORTRAIT',
           createdAt: p.created_at
         }));
 
@@ -544,17 +545,25 @@ export async function saveDbAsync(data: DatabaseSchema): Promise<void> {
 
       // 8. Sync Programmes
       if (Array.isArray(data.programmes) && data.programmes.length > 0) {
-        const progPayload = data.programmes.map(p => ({
-          id: p.id,
-          title: p.title,
-          description: p.description || null,
-          date_time: p.dateTime || new Date().toISOString(),
-          location: p.location || null,
-          photo_urls: p.photoUrl ? [p.photoUrl] : [],
-          video_urls: p.embedUrl ? [p.embedUrl] : [],
-          created_by: 'Super Admin',
-          created_at: p.createdAt || new Date().toISOString()
-        }));
+        const progPayload = data.programmes.map(p => {
+          const photoUrls = p.photoUrl ? [p.photoUrl] : [];
+          const videoUrls = (p.embedUrl || (p.mediaType === 'YOUTUBE' && p.embedUrl)) ? [p.embedUrl] : [];
+          return {
+            id: p.id,
+            title: p.title,
+            description: p.description || null,
+            date_time: p.dateTime || new Date().toISOString(),
+            location: p.location || null,
+            photo_urls: photoUrls,
+            video_urls: videoUrls,
+            photo_url: p.photoUrl || null,
+            media_type: p.mediaType || (p.embedUrl ? 'YOUTUBE' : 'IMAGE'),
+            embed_url: p.embedUrl || null,
+            video_orientation: p.videoOrientation || 'PORTRAIT',
+            created_by: 'Super Admin',
+            created_at: p.createdAt || new Date().toISOString()
+          };
+        });
         await supabase.from('programmes').upsert(progPayload);
       }
 

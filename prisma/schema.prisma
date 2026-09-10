@@ -119,15 +119,17 @@ model CollectorTransfer {
 }
 
 model Programme {
-  id          String   @id
-  title       String
-  description String?
-  dateTime    DateTime @map("date_time")
-  location    String?
-  photoUrls   Json?    @map("photo_urls")
-  videoUrls   Json?    @map("video_urls")
-  createdBy   String   @map("created_by")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id               String   @id
+  title            String
+  description      String?
+  dateTime         DateTime @map("date_time")
+  location         String?
+  photoUrl         String?  @map("photo_url")
+  mediaType        String?  @map("media_type")
+  embedUrl         String?  @map("embed_url")
+  videoOrientation String?  @map("video_orientation")
+  createdBy        String   @default("Super Admin") @map("created_by")
+  createdAt        DateTime @default(now()) @map("created_at")
 
   @@map("programmes")
 }
