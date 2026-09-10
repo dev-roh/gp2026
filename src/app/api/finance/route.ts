@@ -95,6 +95,20 @@ export async function GET(req: Request) {
 
   const totalPendingActionCount = pendingApprovalsForMe.length + pendingCollectorTransfersForMe.length + pendingMembershipRequestsCount;
 
+  const canViewPrivate = userRole === 'SUPER_ADMIN' || userRole === 'TREASURER' || userRole === 'COLLECTOR';
+
+  const sanitizedContributions = db.contributions.map(c => {
+    if (c.isPrivate && !canViewPrivate) {
+      return {
+        ...c,
+        memberName: 'Anonymous / Confidential',
+        memberArea: 'Confidential Area',
+        note: c.note ? '*** Private Note ***' : undefined
+      };
+    }
+    return c;
+  });
+
   return NextResponse.json({
     settings: db.settings,
     summary: {
@@ -106,7 +120,7 @@ export async function GET(req: Request) {
       targetGoal: db.settings?.targetGoalAmount || 200000
     },
     collectorBalances,
-    latestContributions: db.contributions.slice().reverse(),
+    latestContributions: sanitizedContributions.slice().reverse(),
     pendingApprovalsForMe,
     pendingCollectorTransfersForMe,
     collectorTransfers: (db.collectorTransfers || []).slice().reverse(),
@@ -621,6 +635,31 @@ export async function POST(req: Request) {
         success: true,
         deletedCount,
         message: `Successfully deleted ${deletedCount} contribution(s).`
+      });
+    }
+
+    if (type === 'TOGGLE_PRIVATE') {
+      if (userRole !== 'COLLECTOR' && userRole !== 'TREASURER' && userRole !== 'SUPER_ADMIN') {
+        return NextResponse.json({ error: 'Forbidden. Only Collectors, Treasurer, or Super Admin can change privacy settings.' }, { status: 403 });
+      }
+
+      const { contributionId, isPrivate } = data;
+      if (!contributionId) {
+        return NextResponse.json({ error: 'Contribution ID is required.' }, { status: 400 });
+      }
+
+      const index = db.contributions.findIndex(c => c.id === contributionId);
+      if (index === -1) {
+        return NextResponse.json({ error: 'Contribution not found.' }, { status: 404 });
+      }
+
+      db.contributions[index].isPrivate = Boolean(isPrivate);
+      await saveDbAsync(db);
+
+      return NextResponse.json({
+        success: true,
+        item: db.contributions[index],
+        message: `Contribution marked as ${isPrivate ? 'Private' : 'Public'}.`
       });
     }
 

@@ -49,6 +49,7 @@ export interface Contribution {
   status: 'APPROVED' | 'PENDING_COLLECTOR_APPROVAL' | 'PENDING_SUPER_ADMIN_APPROVAL' | 'REJECTED';
   approverEmail?: string;
   isSelfContribution?: boolean;
+  isPrivate?: boolean;
 }
 
 export interface CollectorTransfer {

@@ -70,6 +70,7 @@ interface Contribution {
   collectorId: string;
   collectorName: string;
   status: 'APPROVED' | 'PENDING_COLLECTOR_APPROVAL' | 'PENDING_SUPER_ADMIN_APPROVAL' | 'REJECTED';
+  isPrivate?: boolean;
 }
 
 interface CollectorTransfer {
@@ -338,7 +339,8 @@ export default function HomePage() {
     memberArea: '',
     amount: '',
     paymentMode: 'CASH' as 'CASH' | 'UPI' | 'BANK_TRANSFER',
-    note: ''
+    note: '',
+    isPrivate: false
   });
 
   const [selfContribForm, setSelfContribForm] = useState({
@@ -928,7 +930,8 @@ export default function HomePage() {
           paymentMode: contribForm.paymentMode,
           collectorId: session?.user?.email || 'usr-2',
           collectorName: session?.user?.name || 'Collector',
-          note: contribForm.note
+          note: contribForm.note,
+          isPrivate: contribForm.isPrivate
         }
       })
     });
@@ -936,13 +939,38 @@ export default function HomePage() {
     const result = await res.json();
     if (res.ok) {
       setShowAddContribution(false);
-      setContribForm({ memberName: '', memberArea: '', amount: '', paymentMode: 'CASH', note: '' });
+      setContribForm({ memberName: '', memberArea: '', amount: '', paymentMode: 'CASH', note: '', isPrivate: false });
       fetchFinanceData();
       if (result?.item) {
         setSelectedReceipt(result.item);
       }
     } else {
       alert(result.error || 'Operation failed');
+    }
+  };
+
+  const handleTogglePrivate = async (contributionId: string, currentIsPrivate: boolean) => {
+    try {
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'TOGGLE_PRIVATE',
+          data: {
+            contributionId,
+            isPrivate: !currentIsPrivate
+          }
+        })
+      });
+
+      const result = await res.json();
+      if (res.ok) {
+        fetchFinanceData();
+      } else {
+        alert(result.error || 'Failed to update privacy setting');
+      }
+    } catch (err) {
+      alert('Error updating privacy setting');
     }
   };
 
@@ -2157,6 +2185,11 @@ export default function HomePage() {
                       <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase ${c.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
                         {c.status}
                       </span>
+                      {c.isPrivate && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-slate-800 text-amber-300 border border-slate-700 flex items-center gap-1">
+                          🔒 Private
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2166,6 +2199,19 @@ export default function HomePage() {
                     <p className="font-black text-emerald-600 text-base">₹{c.amount.toLocaleString()}</p>
                     <span className="text-[10px] text-slate-500 font-bold">{c.paymentMode}</span>
                   </div>
+                  {(isCollector || isTreasurer || isSuperAdmin) && (
+                    <button
+                      onClick={() => handleTogglePrivate(c.id, Boolean(c.isPrivate))}
+                      className={`p-2 rounded-xl border text-[10px] font-bold shadow-xs transition flex items-center space-x-1 ${
+                        c.isPrivate
+                          ? 'bg-slate-800 text-amber-300 border-slate-700 hover:bg-slate-900'
+                          : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                      }`}
+                      title={c.isPrivate ? 'Mark as Public' : 'Mark as Private (Hidden from public views)'}
+                    >
+                      <span>{c.isPrivate ? '🔒 Private' : '👁️ Public'}</span>
+                    </button>
+                  )}
                   {isCollector && c.collectorId.toLowerCase() === (session?.user?.email || '').toLowerCase() && c.status === 'APPROVED' && (
                     <button 
                       onClick={() => {
@@ -2821,6 +2867,19 @@ export default function HomePage() {
                   <option value="UPI">UPI / QR Scan</option>
                   <option value="BANK_TRANSFER">Bank NetBanking</option>
                 </select>
+              </div>
+              <div className="flex items-center space-x-2 pt-1 bg-slate-850 p-2.5 rounded-lg border border-slate-700">
+                <input
+                  type="checkbox"
+                  id="isPrivateContrib"
+                  checked={contribForm.isPrivate}
+                  onChange={(e) => setContribForm({ ...contribForm, isPrivate: e.target.checked })}
+                  className="w-4 h-4 rounded text-orange-500 focus:ring-orange-500 border-slate-600 bg-slate-800"
+                />
+                <label htmlFor="isPrivateContrib" className="text-slate-200 font-semibold cursor-pointer select-none">
+                  🔒 Mark as Private Contribution
+                  <span className="block text-[10px] text-slate-400 font-normal">Hidden from public views; only visible to Super Admin, Treasurer, and Collectors. Included in totals.</span>
+                </label>
               </div>
               <div className="pt-2 flex gap-2">
                 <button type="button" onClick={() => setShowAddContribution(false)} className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 font-medium">Cancel</button>
