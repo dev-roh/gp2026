@@ -301,6 +301,7 @@ export default function HomePage() {
 
   // Programme Form State
   const [showAddProgramme, setShowAddProgramme] = useState(false);
+  const [editingProgrammeId, setEditingProgrammeId] = useState<string | null>(null);
   const [programmeForm, setProgrammeForm] = useState({
     title: '',
     description: '',
@@ -741,22 +742,43 @@ export default function HomePage() {
     }
   };
 
+  const handleOpenEditProgramme = (prog: ProgrammeItem) => {
+    setEditingProgrammeId(prog.id);
+    setProgrammeForm({
+      title: prog.title || '',
+      description: prog.description || '',
+      dateTime: prog.dateTime ? new Date(prog.dateTime).toISOString().slice(0, 16) : '',
+      location: prog.location || '',
+      photoUrl: prog.photoUrl || '',
+      mediaType: prog.mediaType || 'IMAGE',
+      embedUrl: prog.embedUrl || '',
+      videoOrientation: prog.videoOrientation || 'PORTRAIT'
+    });
+    setShowAddProgramme(true);
+  };
+
   const handleAddProgramme = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!programmeForm.title || !programmeForm.dateTime) return;
+
+    const actionType = editingProgrammeId ? 'EDIT_PROGRAMME' : 'ADD_PROGRAMME';
+    const payloadData = editingProgrammeId 
+      ? { programmeId: editingProgrammeId, ...programmeForm }
+      : programmeForm;
 
     const res = await fetch('/api/finance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        type: 'ADD_PROGRAMME',
-        data: programmeForm
+        type: actionType,
+        data: payloadData
       })
     });
 
     const result = await res.json();
     if (res.ok) {
       setShowAddProgramme(false);
+      setEditingProgrammeId(null);
       setProgrammeForm({
         title: '',
         description: '',
@@ -769,7 +791,7 @@ export default function HomePage() {
       });
       fetchFinanceData();
     } else {
-      alert(result.error || 'Failed to add programme');
+      alert(result.error || `Failed to ${editingProgrammeId ? 'update' : 'add'} programme`);
     }
   };
 
@@ -1555,7 +1577,20 @@ export default function HomePage() {
             </div>
             {isSuperAdmin && (
               <button
-                onClick={() => setShowAddProgramme(true)}
+                onClick={() => {
+                  setEditingProgrammeId(null);
+                  setProgrammeForm({
+                    title: '',
+                    description: '',
+                    dateTime: '',
+                    location: '',
+                    photoUrl: '',
+                    mediaType: 'IMAGE',
+                    embedUrl: '',
+                    videoOrientation: 'LANDSCAPE'
+                  });
+                  setShowAddProgramme(true);
+                }}
                 className="px-3.5 py-2 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-extrabold text-xs shadow-md transition"
               >
                 + Add Activity
@@ -1583,13 +1618,22 @@ export default function HomePage() {
                         </p>
                       </div>
                       {isSuperAdmin && (
-                        <button
-                          onClick={() => handleDeleteProgramme(prog.id)}
-                          className="text-slate-400 hover:text-rose-600 text-xs p-1 font-bold"
-                          title="Remove Activity"
-                        >
-                          ✕
-                        </button>
+                        <div className="flex items-center space-x-1.5">
+                          <button
+                            onClick={() => handleOpenEditProgramme(prog)}
+                            className="px-2.5 py-1 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold text-[10px] border border-amber-300/80 transition flex items-center gap-1 shadow-2xs"
+                            title="Edit Schedule & Media"
+                          >
+                            ✏️ Edit Media
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProgramme(prog.id)}
+                            className="text-slate-400 hover:text-rose-600 text-xs p-1 font-bold"
+                            title="Remove Activity"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       )}
                     </div>
 
@@ -3088,8 +3132,8 @@ export default function HomePage() {
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
           <div className="bg-slate-900 border border-cyan-500/30 w-full max-w-sm rounded-2xl p-4 shadow-2xl space-y-3">
             <h3 className="text-sm font-bold text-slate-100 flex justify-between items-center">
-              <span>+ Add Festival Programme Activity</span>
-              <button onClick={() => setShowAddProgramme(false)} className="text-slate-400 text-xs">✕</button>
+              <span>{editingProgrammeId ? '✏️ Edit Programme & Media' : '+ Add Festival Programme Activity'}</span>
+              <button onClick={() => { setShowAddProgramme(false); setEditingProgrammeId(null); }} className="text-slate-400 text-xs">✕</button>
             </h3>
             <form onSubmit={handleAddProgramme} className="space-y-2.5 text-xs">
               <div>
@@ -3194,8 +3238,10 @@ export default function HomePage() {
               )}
 
               <div className="pt-2 flex gap-2">
-                <button type="button" onClick={() => setShowAddProgramme(false)} className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 font-medium">Cancel</button>
-                <button type="submit" className="flex-1 py-2 rounded-lg bg-cyan-600 text-white font-bold">Publish Activity</button>
+                <button type="button" onClick={() => { setShowAddProgramme(false); setEditingProgrammeId(null); }} className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 font-medium">Cancel</button>
+                <button type="submit" className="flex-1 py-2 rounded-lg bg-cyan-600 text-white font-bold">
+                  {editingProgrammeId ? 'Save Changes' : 'Publish Activity'}
+                </button>
               </div>
             </form>
           </div>

@@ -362,6 +362,53 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, item: newProg });
     }
 
+    if (type === 'EDIT_PROGRAMME') {
+      if (userRole !== 'SUPER_ADMIN') {
+        return NextResponse.json({ error: 'Forbidden. Only Super Admin can edit festival programmes.' }, { status: 403 });
+      }
+
+      const { programmeId, title, description, dateTime, location, photoUrl, mediaType, embedUrl, videoOrientation } = data;
+      if (!programmeId) {
+        return NextResponse.json({ error: 'Missing programme ID' }, { status: 400 });
+      }
+
+      if (!db.programmes) db.programmes = [];
+      const progIndex = db.programmes.findIndex(p => p.id === programmeId);
+      if (progIndex === -1) {
+        return NextResponse.json({ error: 'Programme not found' }, { status: 404 });
+      }
+
+      // Security Whitelisting for YouTube & Instagram URL embeds
+      if (mediaType === 'YOUTUBE' && embedUrl) {
+        const isWhitelisted = /^https:\/\/(www\.)?(youtube\.com|youtu\.be)\/.+/i.test(embedUrl);
+        if (!isWhitelisted) {
+          return NextResponse.json({ error: 'Invalid YouTube URL. Only official youtube.com or youtu.be links are allowed.' }, { status: 400 });
+        }
+      }
+
+      if (mediaType === 'INSTAGRAM' && embedUrl) {
+        const isWhitelisted = /^https:\/\/(www\.)?instagram\.com\/(p|reel)\/.+/i.test(embedUrl);
+        if (!isWhitelisted) {
+          return NextResponse.json({ error: 'Invalid Instagram URL. Only official instagram.com/p/ or /reel/ links are allowed.' }, { status: 400 });
+        }
+      }
+
+      db.programmes[progIndex] = {
+        ...db.programmes[progIndex],
+        title: title || db.programmes[progIndex].title,
+        description: description !== undefined ? description : db.programmes[progIndex].description,
+        dateTime: dateTime || db.programmes[progIndex].dateTime,
+        location: location !== undefined ? location : db.programmes[progIndex].location,
+        photoUrl: photoUrl !== undefined ? photoUrl : db.programmes[progIndex].photoUrl,
+        mediaType: mediaType || db.programmes[progIndex].mediaType || 'IMAGE',
+        embedUrl: embedUrl !== undefined ? embedUrl : db.programmes[progIndex].embedUrl,
+        videoOrientation: videoOrientation || db.programmes[progIndex].videoOrientation || 'PORTRAIT'
+      };
+
+      await saveDbAsync(db);
+      return NextResponse.json({ success: true, item: db.programmes[progIndex] });
+    }
+
     if (type === 'DELETE_PROGRAMME') {
       if (userRole !== 'SUPER_ADMIN') {
         return NextResponse.json({ error: 'Forbidden. Only Super Admin can remove festival programmes.' }, { status: 403 });
