@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getDbAsync, saveDbAsync, getUserRole, registerOrUpdateUser, logUserActivity } from '@/lib/db';
+import { getDbAsync, saveDbAsync, getUserRole, registerOrUpdateUser, logUserActivity, supabase } from '@/lib/db';
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -415,6 +415,13 @@ export async function POST(req: Request) {
       }
       if (!db.programmes) db.programmes = [];
       db.programmes = db.programmes.filter(p => p.id !== data.programmeId);
+      if (supabase && data.programmeId) {
+        try {
+          await supabase.from('programmes').delete().eq('id', data.programmeId);
+        } catch (e) {
+          console.error('Failed to delete programme from Supabase:', e);
+        }
+      }
       await saveDbAsync(db);
       return NextResponse.json({ success: true });
     }
@@ -669,6 +676,14 @@ export async function POST(req: Request) {
       
       db.contributions = db.contributions.filter(c => !idsToDelete.has(c.id));
       const deletedCount = initialCount - db.contributions.length;
+
+      if (supabase && idsToDelete.size > 0) {
+        try {
+          await supabase.from('contributions').delete().in('id', Array.from(idsToDelete));
+        } catch (e) {
+          console.error('Failed to delete contributions from Supabase:', e);
+        }
+      }
 
       // Log deletion notifications for audit trail
       if (!db.notifications) db.notifications = [];

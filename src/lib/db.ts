@@ -167,6 +167,7 @@ declare global {
 const primaryDbPath = path.join(process.cwd(), 'data', 'db.json');
 const tmpDbPath = path.join('/tmp', 'db.json');
 
+const SUPER_ADMIN_EMAILS = ['luhurenbaiclub@gmail.com', 'luhurenbai@gmail.com'];
 const SUPER_ADMIN_EMAIL = 'luhurenbaiclub@gmail.com';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -198,10 +199,12 @@ const defaultSettings: AppSettings = {
 const initialData: DatabaseSchema = {
   settings: defaultSettings,
   users: [
-    { id: 'usr-0', name: 'Super Admin', email: SUPER_ADMIN_EMAIL, role: 'SUPER_ADMIN', area: 'Admin Central', phone: '+919999999999', createdAt: new Date().toISOString() }
+    { id: 'usr-0', name: 'Super Admin', email: SUPER_ADMIN_EMAIL, role: 'SUPER_ADMIN', area: 'Admin Central', phone: '+919999999999', createdAt: new Date().toISOString() },
+    { id: 'usr-0b', name: 'Super Admin', email: 'luhurenbai@gmail.com', role: 'SUPER_ADMIN', area: 'Admin Central', phone: '+919999999999', createdAt: new Date().toISOString() }
   ],
   roleAssignments: {
-    [SUPER_ADMIN_EMAIL]: { email: SUPER_ADMIN_EMAIL, role: 'SUPER_ADMIN', assignedBy: 'SYSTEM', updatedAt: new Date().toISOString() }
+    [SUPER_ADMIN_EMAIL]: { email: SUPER_ADMIN_EMAIL, role: 'SUPER_ADMIN', assignedBy: 'SYSTEM', updatedAt: new Date().toISOString() },
+    'luhurenbai@gmail.com': { email: 'luhurenbai@gmail.com', role: 'SUPER_ADMIN', assignedBy: 'SYSTEM', updatedAt: new Date().toISOString() }
   },
   contributions: [],
   notifications: [],
@@ -763,7 +766,7 @@ export function saveDb(data: DatabaseSchema) {
 
 export function getUserRole(email: string | null | undefined): 'SUPER_ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER' | 'VIEW_ONLY' {
   if (!email) return 'VIEW_ONLY';
-  if (email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return 'SUPER_ADMIN';
+  if (SUPER_ADMIN_EMAILS.some(e => e.toLowerCase() === email.toLowerCase())) return 'SUPER_ADMIN';
 
   const db = getDb();
   const assignment = db.roleAssignments[email.toLowerCase()];

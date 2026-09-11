@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getDbAsync, saveDbAsync, getUserRole, User } from '@/lib/db';
+import { getDbAsync, saveDbAsync, getUserRole, User, supabase } from '@/lib/db';
 
 const SUPER_ADMIN_EMAIL = 'luhurenbaiclub@gmail.com';
 
@@ -378,6 +378,15 @@ export async function POST(req: Request) {
       // Remove role assignment if exists
       if (db.roleAssignments[targetUser.email.toLowerCase()]) {
         delete db.roleAssignments[targetUser.email.toLowerCase()];
+      }
+
+      if (supabase) {
+        try {
+          await supabase.from('users').delete().eq('id', targetUser.id);
+          await supabase.from('role_assignments').delete().eq('email', targetUser.email.toLowerCase());
+        } catch (e) {
+          console.error('Failed to delete user / role from Supabase:', e);
+        }
       }
 
       // Unlink memberId from contributions, converting them to standalone entry name records

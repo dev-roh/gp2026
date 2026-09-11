@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getDbAsync, saveDbAsync, getUserRole, logUserActivity } from '@/lib/db';
+import { getDbAsync, saveDbAsync, getUserRole, logUserActivity, supabase } from '@/lib/db';
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -112,6 +112,21 @@ export async function DELETE() {
         updatedAt: new Date().toISOString()
       }
     };
+
+    if (supabase) {
+      try {
+        await supabase.from('contributions').delete().neq('id', '');
+        await supabase.from('handovers').delete().neq('id', '');
+        await supabase.from('expenses').delete().neq('id', '');
+        await supabase.from('notifications').delete().neq('id', '');
+        await supabase.from('collector_transfers').delete().neq('id', '');
+        await supabase.from('membership_requests').delete().neq('id', '');
+        await supabase.from('users').delete().neq('email', 'luhurenbaiclub@gmail.com');
+        await supabase.from('role_assignments').delete().neq('email', 'luhurenbaiclub@gmail.com');
+      } catch (e) {
+        console.error('Failed to reset Supabase tables:', e);
+      }
+    }
 
     await saveDbAsync(db);
     return NextResponse.json({ success: true, message: 'Database reset successfully for fresh start.' });

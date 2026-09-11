@@ -489,7 +489,7 @@ export default function HomePage() {
 
   const fetchMembersDirectory = async () => {
     try {
-      const res = await fetch('/api/admin/users');
+      const res = await fetch('/api/admin/users', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setMembersDirectory(data.members || []);
@@ -614,7 +614,7 @@ export default function HomePage() {
   };
 
   const [pendingCollectorTransfersForMe, setPendingCollectorTransfersForMe] = useState<CollectorTransfer[]>([]);
-  const [collectorTransfers, setCollectorTransfers] = useState<CollectorTransfer[]>([]);
+  const [showTransferModal, setShowTransferModal] = useState(false);
   const [selectedContributionForTransfer, setSelectedContributionForTransfer] = useState<Contribution | null>(null);
   const [targetTransferCollectorEmail, setTargetTransferCollectorEmail] = useState('');
   const [transferNotes, setTransferNotes] = useState('');
@@ -645,6 +645,7 @@ export default function HomePage() {
     const result = await res.json();
     if (res.ok) {
       alert(`✅ ${result.message}`);
+      setShowTransferModal(false);
       setSelectedContributionForTransfer(null);
       setSelectedContributionIds([]);
       setTargetTransferCollectorEmail('');
@@ -677,7 +678,7 @@ export default function HomePage() {
   const fetchFinanceData = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/finance');
+      const res = await fetch('/api/finance', { cache: 'no-store' });
       const data = await res.json();
       if (data.settings) setSettings(data.settings);
       setSummary(data.summary);
@@ -2193,6 +2194,7 @@ export default function HomePage() {
                     if (collectorsList.length > 0) {
                       setTargetTransferCollectorEmail(collectorsList.find(u => u.email.toLowerCase() !== (session?.user?.email || '').toLowerCase())?.email || '');
                     }
+                    setShowTransferModal(true);
                   }}
                   className="text-xs px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-xs flex items-center space-x-1"
                 >
@@ -2281,6 +2283,7 @@ export default function HomePage() {
                         if (collectorsList.length > 0) {
                           setTargetTransferCollectorEmail(collectorsList.find(u => u.email.toLowerCase() !== (session?.user?.email || '').toLowerCase())?.email || '');
                         }
+                        setShowTransferModal(true);
                       }}
                       className="p-2 rounded-xl bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 shadow-xs flex items-center space-x-1"
                       title="Transfer collection entry to another collector"
@@ -3249,7 +3252,7 @@ export default function HomePage() {
       )}
 
       {/* Transfer Collection Entry Modal */}
-      {(selectedContributionForTransfer || selectedContributionIds.length > 0) && (
+      {showTransferModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white border border-amber-200 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
             <div className="flex items-center space-x-2 text-orange-600 border-b border-amber-100 pb-3">
@@ -3310,8 +3313,8 @@ export default function HomePage() {
                 <button 
                   type="button" 
                   onClick={() => {
+                    setShowTransferModal(false);
                     setSelectedContributionForTransfer(null);
-                    setSelectedContributionIds([]);
                   }} 
                   className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition"
                 >
