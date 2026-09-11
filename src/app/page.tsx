@@ -614,6 +614,7 @@ export default function HomePage() {
   };
 
   const [pendingCollectorTransfersForMe, setPendingCollectorTransfersForMe] = useState<CollectorTransfer[]>([]);
+  const [collectorTransfers, setCollectorTransfers] = useState<CollectorTransfer[]>([]);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [selectedContributionForTransfer, setSelectedContributionForTransfer] = useState<Contribution | null>(null);
   const [targetTransferCollectorEmail, setTargetTransferCollectorEmail] = useState('');
