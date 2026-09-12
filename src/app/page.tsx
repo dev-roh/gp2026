@@ -24,7 +24,12 @@ import {
   Video,
   Camera,
   Play,
-  Trash2
+  Trash2,
+  Search,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+  MoreVertical
 } from 'lucide-react';
 import { AppSettings, User as DbUser, ProgrammeItem } from '@/lib/db';
 
@@ -405,6 +410,22 @@ export default function HomePage() {
   const [addMemberForm, setAddMemberForm] = useState({ name: '', area: '', phone: '', email: '', role: 'MEMBER' as 'MEMBER' | 'COLLECTOR' | 'TREASURER' });
   const [addMemberMsg, setAddMemberMsg] = useState('');
   const [searchMemberQuery, setSearchMemberQuery] = useState('');
+  const [sortMemberKey, setSortMemberKey] = useState<'name' | 'area' | 'role' | 'totalContributed'>('name');
+  const [sortMemberOrder, setSortMemberOrder] = useState<'asc' | 'desc'>('asc');
+  const [memberPage, setMemberPage] = useState(1);
+
+  // Collections Tab Search, Sort, Pagination, and Kebab Menu State
+  const [searchContribQuery, setSearchContribQuery] = useState('');
+  const [sortContribKey, setSortContribKey] = useState<'date' | 'amount' | 'memberName' | 'receiptNo'>('date');
+  const [sortContribOrder, setSortContribOrder] = useState<'asc' | 'desc'>('desc');
+  const [contribPage, setContribPage] = useState(1);
+  const [activeKebabId, setActiveKebabId] = useState<string | null>(null);
+
+  // Expenses Tab Search, Sort, Pagination State
+  const [searchExpenseQuery, setSearchExpenseQuery] = useState('');
+  const [sortExpenseKey, setSortExpenseKey] = useState<'date' | 'amount' | 'title' | 'category'>('date');
+  const [sortExpenseOrder, setSortExpenseOrder] = useState<'asc' | 'desc'>('desc');
+  const [expensePage, setExpensePage] = useState(1);
 
   // Edit User details state
   const [showEditUserModal, setShowEditUserModal] = useState(false);
@@ -2015,78 +2036,175 @@ export default function HomePage() {
           )}
 
           {/* Members Directory Searchable List */}
-          <div className="bg-white border border-amber-200/80 rounded-3xl p-5 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-amber-100 pb-3">
-              <div>
-                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                  <Users className="w-4 h-4 text-emerald-600" />
-                  <span>Public Members Directory ({membersDirectory.length})</span>
-                </h3>
-                <p className="text-[11px] text-slate-500 font-medium">All active members, registered OAuth users, and field collection entities</p>
-              </div>
+          {(() => {
+            const filtered = membersDirectory.filter(m => {
+              if (!searchMemberQuery.trim()) return true;
+              const q = searchMemberQuery.toLowerCase();
+              return m.name.toLowerCase().includes(q) || m.area.toLowerCase().includes(q) || m.role.toLowerCase().includes(q);
+            });
 
-              <input
-                type="text"
-                placeholder="🔍 Search member name or area..."
-                value={searchMemberQuery}
-                onChange={(e) => setSearchMemberQuery(e.target.value)}
-                className="w-full sm:w-64 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 font-semibold focus:outline-none focus:border-orange-500"
-              />
-            </div>
+            const sorted = [...filtered].sort((a, b) => {
+              let valA: any = a[sortMemberKey];
+              let valB: any = b[sortMemberKey];
+              if (typeof valA === 'string') valA = valA.toLowerCase();
+              if (typeof valB === 'string') valB = valB.toLowerCase();
+              if (valA < valB) return sortMemberOrder === 'asc' ? -1 : 1;
+              if (valA > valB) return sortMemberOrder === 'asc' ? 1 : -1;
+              return 0;
+            });
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {membersDirectory
-                .filter(m => !searchMemberQuery || m.name.toLowerCase().includes(searchMemberQuery.toLowerCase()) || m.area.toLowerCase().includes(searchMemberQuery.toLowerCase()))
-                .map((m) => (
-                  <div key={m.id} className="p-3.5 rounded-2xl border border-slate-100 bg-gradient-to-br from-slate-50/50 to-white hover:border-amber-200 transition shadow-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2.5">
-                        {m.image ? (
-                          <img src={m.image} alt={m.name} className="w-8 h-8 rounded-full border border-amber-300 object-cover shrink-0" />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 text-white font-bold text-xs flex items-center justify-center shrink-0">
-                            {m.name.charAt(0)}
+            const pageSize = 15;
+            const totalPages = Math.ceil(sorted.length / pageSize) || 1;
+            const currentPage = Math.min(memberPage, totalPages);
+            const startIndex = (currentPage - 1) * pageSize;
+            const paginated = sorted.slice(startIndex, startIndex + pageSize);
+
+            return (
+              <div className="bg-white border border-amber-200/80 rounded-3xl p-5 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-amber-100 pb-3">
+                  <div>
+                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-emerald-600" />
+                      <span>Public Members Directory ({filtered.length}{filtered.length !== membersDirectory.length ? ` / ${membersDirectory.length}` : ''})</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium">All active members, registered OAuth users, and field collection entities</p>
+                  </div>
+                </div>
+
+                {/* Search & Sort Toolbar */}
+                <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between text-xs">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search member name, area, or role..."
+                      value={searchMemberQuery}
+                      onChange={(e) => {
+                        setSearchMemberQuery(e.target.value);
+                        setMemberPage(1);
+                      }}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 font-semibold text-slate-800 focus:outline-none focus:border-emerald-500"
+                    />
+                    {searchMemberQuery && (
+                      <button 
+                        onClick={() => setSearchMemberQuery('')}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 font-bold text-xs"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <span className="text-slate-500 font-bold whitespace-nowrap">Sort:</span>
+                    <select
+                      value={sortMemberKey}
+                      onChange={(e) => setSortMemberKey(e.target.value as any)}
+                      className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold text-slate-700 focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="name">Name</option>
+                      <option value="area">Area</option>
+                      <option value="role">Role</option>
+                      <option value="totalContributed">Total Contributed</option>
+                    </select>
+                    <button
+                      onClick={() => setSortMemberOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold shadow-2xs"
+                      title={`Sort Order: ${sortMemberOrder.toUpperCase()}`}
+                    >
+                      <ArrowUpDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {sorted.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-slate-500 space-y-1">
+                    <p className="font-bold text-slate-700">No member records found.</p>
+                    {searchMemberQuery && <p className="text-[11px] text-slate-500">Try adjusting your search filter.</p>}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {paginated.map((m) => (
+                      <div key={m.id} className="p-3.5 rounded-2xl border border-slate-100 bg-gradient-to-br from-slate-50/50 to-white hover:border-amber-200 transition shadow-xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2.5">
+                            {m.image ? (
+                              <img src={m.image} alt={m.name} className="w-8 h-8 rounded-full border border-amber-300 object-cover shrink-0" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                                {m.name.charAt(0)}
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-extrabold text-slate-900 text-xs leading-tight">{m.name}</p>
+                              <span className="text-[10px] text-slate-500 font-medium">{m.area}</span>
+                            </div>
                           </div>
-                        )}
-                        <div>
-                          <p className="font-extrabold text-slate-900 text-xs leading-tight">{m.name}</p>
-                          <span className="text-[10px] text-slate-500 font-medium">{m.area}</span>
+
+                          <div className="flex items-center space-x-1.5">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${m.role === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-800 border border-purple-200' : m.role === 'COLLECTOR' ? 'bg-orange-100 text-orange-800 border border-orange-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'}`}>
+                              {m.role}
+                            </span>
+                            {(isSuperAdmin || isTreasurer) && (
+                              <button
+                                onClick={() => handleOpenEditUser(m)}
+                                className="px-2 py-0.5 text-[10px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition"
+                                title="Edit Member Details"
+                              >
+                                ✏️ Edit
+                              </button>
+                            )}
+                            {isSuperAdmin && !m.id.startsWith('entry-') && (
+                              <button
+                                onClick={() => handleDeleteUser(m)}
+                                className="px-2 py-0.5 text-[10px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md transition"
+                                title="Delete Member"
+                              >
+                                🗑️ Delete
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
+                          <span className="text-slate-500 font-semibold">Total Contribution:</span>
+                          <span className="font-black text-emerald-600 text-xs">₹{m.totalContributed.toLocaleString()} ({m.countContributed} records)</span>
                         </div>
                       </div>
+                    ))}
+                  </div>
+                )}
 
-                      <div className="flex items-center space-x-1.5">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${m.role === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-800 border border-purple-200' : m.role === 'COLLECTOR' ? 'bg-orange-100 text-orange-800 border border-orange-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'}`}>
-                          {m.role}
-                        </span>
-                        {(isSuperAdmin || isTreasurer) && (
-                          <button
-                            onClick={() => handleOpenEditUser(m)}
-                            className="px-2 py-0.5 text-[10px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition"
-                            title="Edit Member Details"
-                          >
-                            ✏️ Edit
-                          </button>
-                        )}
-                        {isSuperAdmin && !m.id.startsWith('entry-') && (
-                          <button
-                            onClick={() => handleDeleteUser(m)}
-                            className="px-2 py-0.5 text-[10px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md transition"
-                            title="Delete Member"
-                          >
-                            🗑️ Delete
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-100 text-xs">
+                    <span className="text-slate-500 font-semibold">
+                      Showing {startIndex + 1}–{Math.min(startIndex + pageSize, sorted.length)} of {sorted.length} records
+                    </span>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
-                      <span className="text-slate-500 font-semibold">Total Contribution:</span>
-                      <span className="font-black text-emerald-600 text-xs">₹{m.totalContributed.toLocaleString()} ({m.countContributed} records)</span>
+                    <div className="flex items-center space-x-1.5">
+                      <button
+                        disabled={currentPage <= 1}
+                        onClick={() => setMemberPage(prev => Math.max(1, prev - 1))}
+                        className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 font-bold border border-slate-200 transition"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <span className="px-3 py-1 font-extrabold text-slate-800 bg-amber-50 border border-amber-200 rounded-xl">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <button
+                        disabled={currentPage >= totalPages}
+                        onClick={() => setMemberPage(prev => Math.min(totalPages, prev + 1))}
+                        className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 font-bold border border-slate-200 transition"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-                ))}
-            </div>
-          </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* EDIT MEMBER DETAILS MODAL */}
           {showEditUserModal && (
@@ -2179,203 +2297,515 @@ export default function HomePage() {
       )}
 
       {/* TAB CONTENT: Collections */}
-      {activeTab === 'contributions' && (
-        <div className="bg-white border border-amber-200/80 rounded-3xl p-5 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-amber-100 pb-3">
-            <div className="flex items-center space-x-2">
-              {(isCollector || isTreasurer || isSuperAdmin) && contributions.length > 0 && (
+      {activeTab === 'contributions' && (() => {
+        // Filter collections
+        const filtered = contributions.filter(c => {
+          if (!searchContribQuery.trim()) return true;
+          const q = searchContribQuery.toLowerCase();
+          return (
+            c.memberName.toLowerCase().includes(q) ||
+            c.receiptNo.toLowerCase().includes(q) ||
+            c.memberArea.toLowerCase().includes(q) ||
+            c.collectorName.toLowerCase().includes(q) ||
+            c.amount.toString().includes(q)
+          );
+        });
+
+        // Sort collections
+        const sorted = [...filtered].sort((a, b) => {
+          let valA: any = a[sortContribKey];
+          let valB: any = b[sortContribKey];
+          if (typeof valA === 'string') valA = valA.toLowerCase();
+          if (typeof valB === 'string') valB = valB.toLowerCase();
+          if (valA < valB) return sortContribOrder === 'asc' ? -1 : 1;
+          if (valA > valB) return sortContribOrder === 'asc' ? 1 : -1;
+          return 0;
+        });
+
+        // Paginate (15 records per page)
+        const pageSize = 15;
+        const totalPages = Math.ceil(sorted.length / pageSize) || 1;
+        const currentPage = Math.min(contribPage, totalPages);
+        const startIndex = (currentPage - 1) * pageSize;
+        const paginated = sorted.slice(startIndex, startIndex + pageSize);
+
+        return (
+          <div className="bg-white border border-amber-200/80 rounded-3xl p-5 shadow-sm space-y-4">
+            {/* Header & Main Controls */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-amber-100 pb-3">
+              <div className="flex items-center space-x-2">
+                {(isCollector || isTreasurer || isSuperAdmin) && contributions.length > 0 && (
+                  <input
+                    type="checkbox"
+                    checked={selectedContributionIds.length === filtered.length && filtered.length > 0}
+                    onChange={toggleSelectAllContributions}
+                    className="w-4 h-4 rounded text-orange-600 focus:ring-orange-500 border-slate-300"
+                    title="Select all contributions"
+                  />
+                )}
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                  Collections ({filtered.length}{filtered.length !== contributions.length ? ` / ${contributions.length}` : ''})
+                </h3>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                {isCollector && selectedContributionIds.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setSelectedContributionForTransfer(null);
+                      if (collectorsList.length > 0) {
+                        setTargetTransferCollectorEmail(collectorsList.find(u => u.email.toLowerCase() !== (session?.user?.email || '').toLowerCase())?.email || '');
+                      }
+                      setShowTransferModal(true);
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-xs flex items-center space-x-1"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>Transfer ({selectedContributionIds.length})</span>
+                  </button>
+                )}
+
+                {(isTreasurer || isSuperAdmin) && selectedContributionIds.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setDeleteTargetContribution(null);
+                      setShowDeleteModal(true);
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-xs flex items-center space-x-1"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete ({selectedContributionIds.length})</span>
+                  </button>
+                )}
+
+                {isCollector && (
+                  <button 
+                    onClick={() => setShowAddContribution(true)}
+                    className="text-xs px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold shadow-xs"
+                  >
+                    {settings.collectionButtonLabel}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Search and Sort Toolbar */}
+            <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between text-xs">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                 <input
-                  type="checkbox"
-                  checked={selectedContributionIds.length === contributions.length && contributions.length > 0}
-                  onChange={toggleSelectAllContributions}
-                  className="w-4 h-4 rounded text-orange-600 focus:ring-orange-500 border-slate-300"
-                  title="Select all contributions"
+                  type="text"
+                  placeholder="Search member, receipt, area, collector..."
+                  value={searchContribQuery}
+                  onChange={(e) => {
+                    setSearchContribQuery(e.target.value);
+                    setContribPage(1);
+                  }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
                 />
-              )}
-              <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
-                All Collections Logged ({contributions.length})
-              </h3>
+                {searchContribQuery && (
+                  <button 
+                    onClick={() => setSearchContribQuery('')}
+                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 font-bold text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <span className="text-slate-500 font-bold whitespace-nowrap">Sort:</span>
+                <select
+                  value={sortContribKey}
+                  onChange={(e) => setSortContribKey(e.target.value as any)}
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold text-slate-700 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="date">Date</option>
+                  <option value="amount">Amount</option>
+                  <option value="memberName">Member Name</option>
+                  <option value="receiptNo">Receipt No</option>
+                </select>
+                <button
+                  onClick={() => setSortContribOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                  className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold shadow-2xs"
+                  title={`Sort Order: ${sortContribOrder.toUpperCase()}`}
+                >
+                  <ArrowUpDown className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              {isCollector && selectedContributionIds.length > 0 && (
-                <button
-                  onClick={() => {
-                    setSelectedContributionForTransfer(null);
-                    if (collectorsList.length > 0) {
-                      setTargetTransferCollectorEmail(collectorsList.find(u => u.email.toLowerCase() !== (session?.user?.email || '').toLowerCase())?.email || '');
-                    }
-                    setShowTransferModal(true);
-                  }}
-                  className="text-xs px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-xs flex items-center space-x-1"
-                >
-                  <Share2 className="w-3.5 h-3.5" />
-                  <span>Transfer Selected ({selectedContributionIds.length})</span>
-                </button>
-              )}
+            {/* List View with Kebab Actions */}
+            {sorted.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-500 space-y-1">
+                <p className="font-bold text-slate-700">No collection records found.</p>
+                {searchContribQuery && <p className="text-[11px] text-slate-500">Try adjusting your search keywords.</p>}
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {paginated.map((c) => {
+                  const canTransfer = isCollector && c.collectorId.toLowerCase() === (session?.user?.email || '').toLowerCase() && c.status === 'APPROVED';
+                  const canDelete = isTreasurer || isSuperAdmin;
+                  const canTogglePrivate = isCollector || isTreasurer || isSuperAdmin;
+                  const hasMultipleActions = (canTogglePrivate ? 1 : 0) + (canTransfer ? 1 : 0) + (canDelete ? 1 : 0) > 0;
 
-              {(isTreasurer || isSuperAdmin) && selectedContributionIds.length > 0 && (
-                <button
-                  onClick={() => {
-                    setDeleteTargetContribution(null);
-                    setShowDeleteModal(true);
-                  }}
-                  className="text-xs px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-xs flex items-center space-x-1"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Delete Selected ({selectedContributionIds.length})</span>
-                </button>
-              )}
+                  return (
+                    <div key={c.id} className="py-3 text-xs flex justify-between items-center relative">
+                      <div className="flex items-center space-x-3 pr-2">
+                        {(isCollector || isTreasurer || isSuperAdmin) && (
+                          <input
+                            type="checkbox"
+                            checked={selectedContributionIds.includes(c.id)}
+                            onChange={() => toggleSelectContribution(c.id)}
+                            className="w-4 h-4 rounded text-orange-600 focus:ring-orange-500 border-slate-300 shrink-0"
+                          />
+                        )}
+                        <div>
+                          <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                            <span className="font-extrabold text-slate-900 text-sm">{c.memberName}</span>
+                            <span className="text-[10px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md font-medium border border-slate-200">{c.memberArea}</span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">Receipt: <span className="text-slate-700 font-mono font-bold">{c.receiptNo}</span></p>
+                          <div className="flex gap-2 mt-1 items-center flex-wrap">
+                            <span className="text-xs text-slate-500 font-medium">Collector: {c.collectorName}</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase ${c.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                              {c.status}
+                            </span>
+                            {c.isPrivate && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-slate-800 text-amber-300 border border-slate-700 flex items-center gap-1">
+                                🔒 Private
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
 
-              {isCollector && (
-                <button 
-                  onClick={() => setShowAddContribution(true)}
-                  className="text-xs px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold shadow-xs"
-                >
-                  {settings.collectionButtonLabel}
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {contributions.map((c) => (
-              <div key={c.id} className="py-3 text-xs flex justify-between items-center">
-                <div className="flex items-center space-x-3">
-                  {(isCollector || isTreasurer || isSuperAdmin) && (
-                    <input
-                      type="checkbox"
-                      checked={selectedContributionIds.includes(c.id)}
-                      onChange={() => toggleSelectContribution(c.id)}
-                      className="w-4 h-4 rounded text-orange-600 focus:ring-orange-500 border-slate-300 shrink-0"
-                    />
-                  )}
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-extrabold text-slate-900 text-sm">{c.memberName}</span>
-                      <span className="text-[10px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md font-medium border border-slate-200">{c.memberArea}</span>
+                      <div className="text-right flex items-center space-x-2 shrink-0">
+                        <div>
+                          <p className="font-black text-emerald-600 text-base">₹{c.amount.toLocaleString()}</p>
+                          <span className="text-[10px] text-slate-500 font-bold">{c.paymentMode}</span>
+                        </div>
+
+                        {/* Always Visible Primary Action: Receipt Print */}
+                        {c.status === 'APPROVED' && (
+                          <button 
+                            onClick={() => setSelectedReceipt(c)}
+                            className="p-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 shadow-xs"
+                            title="View / Print Digital Receipt"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
+                        )}
+
+                        {/* DESKTOP VIEW: Inline action buttons */}
+                        <div className="hidden md:flex items-center space-x-1.5">
+                          {canTogglePrivate && (
+                            <button
+                              onClick={() => handleTogglePrivate(c.id, Boolean(c.isPrivate))}
+                              className={`p-2 rounded-xl border text-[10px] font-bold shadow-xs transition flex items-center space-x-1 ${
+                                c.isPrivate
+                                  ? 'bg-slate-800 text-amber-300 border-slate-700 hover:bg-slate-900'
+                                  : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                              }`}
+                              title={c.isPrivate ? 'Mark as Public' : 'Mark as Private (Hidden from public views)'}
+                            >
+                              <span>{c.isPrivate ? '🔒 Private' : '👁️ Public'}</span>
+                            </button>
+                          )}
+                          {canTransfer && (
+                            <button 
+                              onClick={() => {
+                                setSelectedContributionForTransfer(c);
+                                if (collectorsList.length > 0) {
+                                  setTargetTransferCollectorEmail(collectorsList.find(u => u.email.toLowerCase() !== (session?.user?.email || '').toLowerCase())?.email || '');
+                                }
+                                setShowTransferModal(true);
+                              }}
+                              className="p-2 rounded-xl bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 shadow-xs flex items-center space-x-1"
+                              title="Transfer collection entry to another collector"
+                            >
+                              <Share2 className="w-3.5 h-3.5" />
+                              <span className="text-[10px] font-extrabold">Transfer</span>
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={() => {
+                                setDeleteTargetContribution(c);
+                                setShowDeleteModal(true);
+                              }}
+                              className="p-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 shadow-xs"
+                              title="Delete Contribution (Mandatory Reason Required)"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* MOBILE VIEW: Compact Kebab Menu Dropdown */}
+                        {hasMultipleActions && (
+                          <div className="relative md:hidden">
+                            <button
+                              onClick={() => setActiveKebabId(prev => prev === c.id ? null : c.id)}
+                              className="p-2 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 font-bold"
+                              title="More Options"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+
+                            {activeKebabId === c.id && (
+                              <>
+                                <div 
+                                  className="fixed inset-0 z-40 bg-transparent" 
+                                  onClick={() => setActiveKebabId(null)} 
+                                />
+                                <div className="absolute right-0 top-10 z-50 w-44 bg-white border border-slate-200 rounded-2xl shadow-xl p-1.5 space-y-1 text-left">
+                                  {canTogglePrivate && (
+                                    <button
+                                      onClick={() => {
+                                        setActiveKebabId(null);
+                                        handleTogglePrivate(c.id, Boolean(c.isPrivate));
+                                      }}
+                                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 flex items-center space-x-2"
+                                    >
+                                      <span>{c.isPrivate ? '👁️ Mark Public' : '🔒 Mark Private'}</span>
+                                    </button>
+                                  )}
+                                  {canTransfer && (
+                                    <button
+                                      onClick={() => {
+                                        setActiveKebabId(null);
+                                        setSelectedContributionForTransfer(c);
+                                        if (collectorsList.length > 0) {
+                                          setTargetTransferCollectorEmail(collectorsList.find(u => u.email.toLowerCase() !== (session?.user?.email || '').toLowerCase())?.email || '');
+                                        }
+                                        setShowTransferModal(true);
+                                      }}
+                                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-orange-700 hover:bg-orange-50 flex items-center space-x-2"
+                                    >
+                                      <Share2 className="w-3.5 h-3.5 text-orange-600" />
+                                      <span>Transfer Entry</span>
+                                    </button>
+                                  )}
+                                  {canDelete && (
+                                    <button
+                                      onClick={() => {
+                                        setActiveKebabId(null);
+                                        setDeleteTargetContribution(c);
+                                        setShowDeleteModal(true);
+                                      }}
+                                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-rose-700 hover:bg-rose-50 flex items-center space-x-2"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                                      <span>Delete Record</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">Receipt: <span className="text-slate-700 font-mono font-bold">{c.receiptNo}</span></p>
-                    <div className="flex gap-2 mt-1 items-center">
-                      <span className="text-xs text-slate-500 font-medium">Collector: {c.collectorName}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase ${c.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                        {c.status}
-                      </span>
-                      {c.isPrivate && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-slate-800 text-amber-300 border border-slate-700 flex items-center gap-1">
-                          🔒 Private
-                        </span>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Pagination Controls Footer */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100 text-xs">
+                <span className="text-slate-500 font-semibold">
+                  Showing {startIndex + 1}–{Math.min(startIndex + pageSize, sorted.length)} of {sorted.length} records
+                </span>
+
+                <div className="flex items-center space-x-1.5">
+                  <button
+                    disabled={currentPage <= 1}
+                    onClick={() => setContribPage(prev => Math.max(1, prev - 1))}
+                    className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 font-bold border border-slate-200 transition"
+                    title="Previous Page"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  <span className="px-3 py-1 font-extrabold text-slate-800 bg-amber-50 border border-amber-200 rounded-xl">
+                    Page {currentPage} of {totalPages}
+                  </span>
+
+                  <button
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setContribPage(prev => Math.min(totalPages, prev + 1))}
+                    className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 font-bold border border-slate-200 transition"
+                    title="Next Page"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* TAB CONTENT: Expenses */}
+      {activeTab === 'expenses' && (() => {
+        const filtered = expenses.filter(exp => {
+          if (!searchExpenseQuery.trim()) return true;
+          const q = searchExpenseQuery.toLowerCase();
+          return (
+            exp.title.toLowerCase().includes(q) ||
+            exp.paidByName.toLowerCase().includes(q) ||
+            exp.category.toLowerCase().includes(q) ||
+            exp.amount.toString().includes(q)
+          );
+        });
+
+        const sorted = [...filtered].sort((a, b) => {
+          let valA: any = a[sortExpenseKey];
+          let valB: any = b[sortExpenseKey];
+          if (typeof valA === 'string') valA = valA.toLowerCase();
+          if (typeof valB === 'string') valB = valB.toLowerCase();
+          if (valA < valB) return sortExpenseOrder === 'asc' ? -1 : 1;
+          if (valA > valB) return sortExpenseOrder === 'asc' ? 1 : -1;
+          return 0;
+        });
+
+        const pageSize = 15;
+        const totalPages = Math.ceil(sorted.length / pageSize) || 1;
+        const currentPage = Math.min(expensePage, totalPages);
+        const startIndex = (currentPage - 1) * pageSize;
+        const paginated = sorted.slice(startIndex, startIndex + pageSize);
+
+        return (
+          <div className="bg-white border border-amber-200/80 rounded-3xl p-5 shadow-sm space-y-4">
+            <div className="flex justify-between items-center border-b border-amber-100 pb-3">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                Puja Expenses & Out-of-Pocket ({filtered.length}{filtered.length !== expenses.length ? ` / ${expenses.length}` : ''})
+              </h3>
+              {isMember && (
+                <button 
+                  onClick={() => setShowAddExpense(true)}
+                  className="text-xs px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white font-bold shadow-xs"
+                >
+                  {settings.spendButtonLabel}
+                </button>
+              )}
+            </div>
+
+            {/* Search and Sort Toolbar */}
+            <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between text-xs">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Search expense title, paid by, category..."
+                  value={searchExpenseQuery}
+                  onChange={(e) => {
+                    setSearchExpenseQuery(e.target.value);
+                    setExpensePage(1);
+                  }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 font-semibold text-slate-800 focus:outline-none focus:border-rose-500"
+                />
+                {searchExpenseQuery && (
+                  <button 
+                    onClick={() => setSearchExpenseQuery('')}
+                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 font-bold text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <span className="text-slate-500 font-bold whitespace-nowrap">Sort:</span>
+                <select
+                  value={sortExpenseKey}
+                  onChange={(e) => setSortExpenseKey(e.target.value as any)}
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold text-slate-700 focus:outline-none focus:border-rose-500"
+                >
+                  <option value="date">Date</option>
+                  <option value="amount">Amount</option>
+                  <option value="title">Title</option>
+                  <option value="category">Category</option>
+                </select>
+                <button
+                  onClick={() => setSortExpenseOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                  className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold shadow-2xs"
+                  title={`Sort Order: ${sortExpenseOrder.toUpperCase()}`}
+                >
+                  <ArrowUpDown className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {sorted.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-500 space-y-1">
+                <p className="font-bold text-slate-700">No expense records found.</p>
+                {searchExpenseQuery && <p className="text-[11px] text-slate-500">Try adjusting your search query.</p>}
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {paginated.map((exp) => (
+                  <div key={exp.id} className="py-3 text-xs flex justify-between items-center">
+                    <div>
+                      <p className="font-extrabold text-slate-900 text-sm">{exp.title}</p>
+                      <p className="text-xs text-slate-500 font-medium">Paid by: {exp.paidByName}</p>
+                      <div className="flex gap-2 mt-1">
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-medium">{exp.category}</span>
+                        {exp.isOutofPocket && (
+                          <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${exp.isReimbursed ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'}`}>
+                            {exp.isReimbursed ? 'Reimbursed' : 'Owed Out-of-pocket'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-black text-rose-600 text-base">₹{exp.amount.toLocaleString()}</p>
+                      {exp.isOutofPocket && !exp.isReimbursed && isTreasurer && (
+                        <button 
+                          onClick={() => handleSettleReimbursement(exp.id)}
+                          className="mt-1 px-3 py-1 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold shadow-xs"
+                        >
+                          Settle Balance
+                        </button>
                       )}
                     </div>
                   </div>
-                </div>
+                ))}
+              </div>
+            )}
 
-                <div className="text-right flex items-center space-x-2">
-                  <div>
-                    <p className="font-black text-emerald-600 text-base">₹{c.amount.toLocaleString()}</p>
-                    <span className="text-[10px] text-slate-500 font-bold">{c.paymentMode}</span>
-                  </div>
-                  {(isCollector || isTreasurer || isSuperAdmin) && (
-                    <button
-                      onClick={() => handleTogglePrivate(c.id, Boolean(c.isPrivate))}
-                      className={`p-2 rounded-xl border text-[10px] font-bold shadow-xs transition flex items-center space-x-1 ${
-                        c.isPrivate
-                          ? 'bg-slate-800 text-amber-300 border-slate-700 hover:bg-slate-900'
-                          : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
-                      }`}
-                      title={c.isPrivate ? 'Mark as Public' : 'Mark as Private (Hidden from public views)'}
-                    >
-                      <span>{c.isPrivate ? '🔒 Private' : '👁️ Public'}</span>
-                    </button>
-                  )}
-                  {isCollector && c.collectorId.toLowerCase() === (session?.user?.email || '').toLowerCase() && c.status === 'APPROVED' && (
-                    <button 
-                      onClick={() => {
-                        setSelectedContributionForTransfer(c);
-                        if (collectorsList.length > 0) {
-                          setTargetTransferCollectorEmail(collectorsList.find(u => u.email.toLowerCase() !== (session?.user?.email || '').toLowerCase())?.email || '');
-                        }
-                        setShowTransferModal(true);
-                      }}
-                      className="p-2 rounded-xl bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 shadow-xs flex items-center space-x-1"
-                      title="Transfer collection entry to another collector"
-                    >
-                      <Share2 className="w-3.5 h-3.5" />
-                      <span className="text-[10px] font-extrabold hidden sm:inline">Transfer</span>
-                    </button>
-                  )}
-                  {c.status === 'APPROVED' && (
-                    <button 
-                      onClick={() => setSelectedReceipt(c)}
-                      className="p-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 shadow-xs"
-                      title="View Digital Receipt"
-                    >
-                      <Printer className="w-4 h-4" />
-                    </button>
-                  )}
-                  {(isTreasurer || isSuperAdmin) && (
-                    <button
-                      onClick={() => {
-                        setDeleteTargetContribution(c);
-                        setShowDeleteModal(true);
-                      }}
-                      className="p-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 shadow-xs"
-                      title="Delete Contribution (Mandatory Reason Required)"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100 text-xs">
+                <span className="text-slate-500 font-semibold">
+                  Showing {startIndex + 1}–{Math.min(startIndex + pageSize, sorted.length)} of {sorted.length} records
+                </span>
+
+                <div className="flex items-center space-x-1.5">
+                  <button
+                    disabled={currentPage <= 1}
+                    onClick={() => setExpensePage(prev => Math.max(1, prev - 1))}
+                    className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 font-bold border border-slate-200 transition"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="px-3 py-1 font-extrabold text-slate-800 bg-amber-50 border border-amber-200 rounded-xl">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setExpensePage(prev => Math.min(totalPages, prev + 1))}
+                    className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 font-bold border border-slate-200 transition"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* TAB CONTENT: Expenses */}
-      {activeTab === 'expenses' && (
-        <div className="bg-white border border-amber-200/80 rounded-3xl p-5 shadow-sm space-y-4">
-          <div className="flex justify-between items-center border-b border-amber-100 pb-3">
-            <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">Puja Expenses & Out-of-Pocket</h3>
-            {isMember && (
-              <button 
-                onClick={() => setShowAddExpense(true)}
-                className="text-xs px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white font-bold shadow-xs"
-              >
-                {settings.spendButtonLabel}
-              </button>
             )}
           </div>
-          <div className="divide-y divide-slate-100">
-            {expenses.map((exp) => (
-              <div key={exp.id} className="py-3 text-xs flex justify-between items-center">
-                <div>
-                  <p className="font-extrabold text-slate-900 text-sm">{exp.title}</p>
-                  <p className="text-xs text-slate-500 font-medium">Paid by: {exp.paidByName}</p>
-                  <div className="flex gap-2 mt-1">
-                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-medium">{exp.category}</span>
-                    {exp.isOutofPocket && (
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${exp.isReimbursed ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'}`}>
-                        {exp.isReimbursed ? 'Reimbursed' : 'Owed Out-of-pocket'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-black text-rose-600 text-base">₹{exp.amount.toLocaleString()}</p>
-                  {exp.isOutofPocket && !exp.isReimbursed && isTreasurer && (
-                    <button 
-                      onClick={() => handleSettleReimbursement(exp.id)}
-                      className="mt-1 px-3 py-1 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold shadow-xs"
-                    >
-                      Settle Balance
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* TAB CONTENT: Reimbursements */}
       {activeTab === 'reimbursements' && (
