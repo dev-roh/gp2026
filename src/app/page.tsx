@@ -298,6 +298,7 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'programmes' | 'collectors' | 'contributions' | 'expenses' | 'reimbursements' | 'approvals' | 'admin' | 'branding' | 'activity'>('overview');
   const [userActivities, setUserActivities] = useState<UserActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [collectorBalances, setCollectorBalances] = useState<CollectorBalance[]>([]);
   const [contributions, setContributions] = useState<Contribution[]>([]);
@@ -306,6 +307,35 @@ export default function HomePage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [handovers, setHandovers] = useState<Handover[]>([]);
   const [programmes, setProgrammes] = useState<ProgrammeItem[]>([]);
+
+  // Hydrate initial state from localStorage cache for instant 0ms rendering
+  useEffect(() => {
+    try {
+      const cachedFinance = localStorage.getItem('gp2026_finance_cache');
+      if (cachedFinance) {
+        const parsed = JSON.parse(cachedFinance);
+        if (parsed.settings) setSettings(parsed.settings);
+        if (parsed.summary) setSummary(parsed.summary);
+        if (parsed.collectorBalances) setCollectorBalances(parsed.collectorBalances);
+        if (parsed.contributions) setContributions(parsed.contributions);
+        if (parsed.pendingApprovalsForMe) setPendingApprovalsForMe(parsed.pendingApprovalsForMe);
+        if (parsed.expenses) setExpenses(parsed.expenses);
+        if (parsed.handovers) setHandovers(parsed.handovers);
+        if (parsed.programmes) setProgrammes(parsed.programmes);
+        if (parsed.membershipRequests) setMembershipRequests(parsed.membershipRequests);
+        if (parsed.registeredUsers) setRegisteredUsers(parsed.registeredUsers);
+        setLoading(false);
+      }
+      const cachedMembers = localStorage.getItem('gp2026_members_cache');
+      if (cachedMembers) {
+        const parsedM = JSON.parse(cachedMembers);
+        if (parsedM.members) setMembersDirectory(parsedM.members);
+        if (parsedM.smartSuggestions) setSmartSuggestions(parsedM.smartSuggestions);
+      }
+    } catch (e) {
+      console.error('Error restoring cache:', e);
+    }
+  }, []);
 
   // Programme Form State
   const [showAddProgramme, setShowAddProgramme] = useState(false);
@@ -537,8 +567,17 @@ export default function HomePage() {
       const res = await fetch('/api/admin/users', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        setMembersDirectory(data.members || []);
+        if (data.members && data.members.length > 0) {
+          setMembersDirectory(data.members);
+        }
         if (data.smartSuggestions) setSmartSuggestions(data.smartSuggestions);
+
+        try {
+          localStorage.setItem('gp2026_members_cache', JSON.stringify({
+            members: data.members || [],
+            smartSuggestions: data.smartSuggestions || []
+          }));
+        } catch (e) {}
       }
     } catch (err) {
       console.error('Error fetching members directory:', err);
@@ -726,29 +765,57 @@ export default function HomePage() {
     }
   };
 
-  const fetchFinanceData = async () => {
+  const fetchFinanceData = async (isBackgroundSync: boolean = false) => {
     try {
-      setLoading(true);
+      if (!isBackgroundSync && contributions.length === 0) {
+        setLoading(true);
+      }
+      setIsRefreshing(true);
       const res = await fetch('/api/finance', { cache: 'no-store' });
       const data = await res.json();
-      if (data.settings) setSettings(data.settings);
-      setSummary(data.summary);
-      setCollectorBalances(data.collectorBalances);
-      setContributions(data.latestContributions);
-      setPendingApprovalsForMe(data.pendingApprovalsForMe || []);
-      if (data.userActivities) setUserActivities(data.userActivities);
-      setCollectorTransfers(data.collectorTransfers || []);
-      setTotalPendingActionCount(data.totalPendingActionCount || 0);
-      setExpenses(data.latestExpenses);
-      setHandovers(data.handovers);
-      setProgrammes(data.programmes || []);
-      setMembershipRequests(data.membershipRequests || []);
-      setRegisteredUsers(data.users || []);
-      fetchMembersDirectory();
+      
+      if (res.ok && data) {
+        if (data.settings) setSettings(data.settings);
+        if (data.summary) setSummary(data.summary);
+        if (data.collectorBalances) setCollectorBalances(data.collectorBalances);
+        if (Array.isArray(data.latestContributions) && data.latestContributions.length > 0) {
+          setContributions(data.latestContributions);
+        }
+        if (data.pendingApprovalsForMe) setPendingApprovalsForMe(data.pendingApprovalsForMe);
+        if (data.userActivities) setUserActivities(data.userActivities);
+        if (data.collectorTransfers) setCollectorTransfers(data.collectorTransfers);
+        setTotalPendingActionCount(data.totalPendingActionCount || 0);
+        if (Array.isArray(data.latestExpenses) && data.latestExpenses.length > 0) {
+          setExpenses(data.latestExpenses);
+        }
+        if (data.handovers) setHandovers(data.handovers);
+        if (data.programmes) setProgrammes(data.programmes);
+        if (data.membershipRequests) setMembershipRequests(data.membershipRequests);
+        if (data.users) setRegisteredUsers(data.users);
+
+        // Cache latest payload locally
+        try {
+          localStorage.setItem('gp2026_finance_cache', JSON.stringify({
+            settings: data.settings,
+            summary: data.summary,
+            collectorBalances: data.collectorBalances,
+            contributions: data.latestContributions,
+            pendingApprovalsForMe: data.pendingApprovalsForMe,
+            expenses: data.latestExpenses,
+            handovers: data.handovers,
+            programmes: data.programmes,
+            membershipRequests: data.membershipRequests,
+            registeredUsers: data.users
+          }));
+        } catch (e) {}
+
+        fetchMembersDirectory();
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching finance data:', err);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -1337,6 +1404,22 @@ export default function HomePage() {
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* Silent Sync / Background Refreshing Indicator */}
+          {isRefreshing && (
+            <span className="text-[10px] text-amber-700 font-bold bg-amber-50 border border-amber-200 px-2 py-1 rounded-xl flex items-center space-x-1">
+              <Loader2 className="w-3 h-3 animate-spin text-amber-600" />
+              <span className="hidden sm:inline">Syncing...</span>
+            </span>
+          )}
+
+          <button
+            onClick={() => fetchFinanceData(false)}
+            className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[10px] font-bold"
+            title="Refresh Latest Data"
+          >
+            🔄 Sync
+          </button>
+
           {/* Pending Approvals Bell Icon */}
           {totalPendingActionCount > 0 && (
             <button 
