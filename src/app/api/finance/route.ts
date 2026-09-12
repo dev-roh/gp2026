@@ -218,6 +218,48 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, item: newContribution, status });
     }
 
+    // EDIT CORPORATE SPONSOR (Super Admin Only)
+    if (type === 'EDIT_SPONSOR') {
+      if (userRole !== 'SUPER_ADMIN') {
+        return NextResponse.json({ error: 'Forbidden: Only Super Admins can edit corporate sponsor details and logos.' }, { status: 403 });
+      }
+
+      const { sponsorId, businessName, category, amount, logoUrl, websiteUrl, mapUrl, phone, notes } = data;
+      const index = db.contributions.findIndex(c => c.id === sponsorId);
+
+      if (index === -1) {
+        return NextResponse.json({ error: 'Sponsor record not found.' }, { status: 404 });
+      }
+
+      const sponsor = db.contributions[index];
+
+      // Update fields
+      if (businessName) sponsor.memberName = businessName.trim();
+      if (category) sponsor.sponsorCategory = category;
+      if (amount !== undefined && !isNaN(Number(amount))) sponsor.amount = Number(amount);
+      if (logoUrl !== undefined) sponsor.sponsorLogoUrl = logoUrl || undefined;
+      if (websiteUrl !== undefined) sponsor.sponsorWebsiteUrl = websiteUrl || undefined;
+      if (mapUrl !== undefined) sponsor.sponsorMapUrl = mapUrl || undefined;
+      if (phone !== undefined) sponsor.sponsorPhone = phone || undefined;
+      if (notes !== undefined) sponsor.note = notes ? `[Sponsor Note]: ${notes.trim()}` : undefined;
+
+      await saveDbAsync(db);
+
+      await logUserActivity(
+        userEmail,
+        session?.user?.name || userEmail,
+        userRole,
+        'EDIT_SPONSOR',
+        `Super Admin edited corporate sponsor "${sponsor.memberName}" (${sponsor.sponsorCategory})`
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: `Corporate sponsor "${sponsor.memberName}" updated successfully!`,
+        sponsor
+      });
+    }
+
     // APPROVE / REJECT SELF CONTRIBUTION
     if (type === 'DECIDE_CONTRIBUTION_APPROVAL') {
       const { contributionId, decision } = data; // decision: 'APPROVE' | 'REJECT'

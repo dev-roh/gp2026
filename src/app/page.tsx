@@ -320,6 +320,9 @@ export default function HomePage() {
 
   // Corporate Sponsorship Modal Form State
   const [showAddSponsorModal, setShowAddSponsorModal] = useState(false);
+  const [editingSponsorId, setEditingSponsorId] = useState<string | null>(null);
+  const [sponsorLogoFile, setSponsorLogoFile] = useState<File | null>(null);
+  const [sponsorLogoError, setSponsorLogoError] = useState<string>('');
   const [sponsorForm, setSponsorForm] = useState({
     businessName: '',
     contactPerson: '',
@@ -1103,61 +1106,150 @@ export default function HomePage() {
     }
   };
 
+  const handleOpenEditSponsor = (sp: Contribution) => {
+    setEditingSponsorId(sp.id);
+    setSponsorLogoFile(null);
+    setSponsorLogoError('');
+    setSponsorForm({
+      businessName: sp.memberName || '',
+      contactPerson: sp.collectorName || '',
+      phone: sp.sponsorPhone || '',
+      memberArea: sp.memberArea || 'General Area',
+      category: sp.sponsorCategory || 'GOLD',
+      amount: String(sp.amount || '10000'),
+      logoUrl: sp.sponsorLogoUrl || '',
+      websiteUrl: sp.sponsorWebsiteUrl || '',
+      mapUrl: sp.sponsorMapUrl || '',
+      notes: sp.note ? sp.note.replace(/^\[Sponsor Note\]:\s*/, '') : ''
+    });
+    setShowAddSponsorModal(true);
+  };
+
+  const handleSponsorLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSponsorLogoError('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedMimes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
+    if (!allowedMimes.includes(file.type.toLowerCase())) {
+      setSponsorLogoError('Invalid image type! Allowed: PNG, JPG, WEBP, SVG');
+      setSponsorLogoFile(null);
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setSponsorLogoError('File exceeds 2 MB limit!');
+      setSponsorLogoFile(null);
+      return;
+    }
+
+    setSponsorLogoFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setSponsorForm(prev => ({ ...prev, logoUrl: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleAddSponsor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sponsorForm.businessName || !sponsorForm.amount || isSubmittingContribution) return;
 
     try {
       setIsSubmittingContribution(true);
-      const res = await fetch('/api/finance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'ADD_CONTRIBUTION',
-          data: {
-            memberName: sponsorForm.businessName.trim(),
-            memberArea: sponsorForm.memberArea || 'General Area',
-            amount: parseFloat(sponsorForm.amount),
-            paymentMode: 'BANK_TRANSFER',
-            collectorId: session?.user?.email || 'usr-2',
-            collectorName: session?.user?.name || 'Collector',
-            note: sponsorForm.notes || `Corporate Sponsor - Contact: ${sponsorForm.contactPerson || 'N/A'} (${sponsorForm.phone || 'N/A'})`,
-            isPrivate: true,
-            isSponsorship: true,
-            sponsorCategory: sponsorForm.category,
-            sponsorLogoUrl: sponsorForm.logoUrl || undefined,
-            sponsorWebsiteUrl: sponsorForm.websiteUrl || undefined,
-            sponsorMapUrl: sponsorForm.mapUrl || undefined,
-            sponsorPhone: sponsorForm.phone || undefined
-          }
-        })
-      });
 
-      const result = await res.json();
-      if (res.ok) {
-        setShowAddSponsorModal(false);
-        setSponsorForm({
-          businessName: '',
-          contactPerson: '',
-          phone: '',
-          memberArea: 'General Area',
-          category: 'GOLD',
-          amount: '10000',
-          logoUrl: '',
-          websiteUrl: '',
-          mapUrl: '',
-          notes: ''
+      if (editingSponsorId) {
+        // EDIT SPONSOR ROUTE (Super Admin Only)
+        const res = await fetch('/api/finance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'EDIT_SPONSOR',
+            data: {
+              sponsorId: editingSponsorId,
+              businessName: sponsorForm.businessName.trim(),
+              category: sponsorForm.category,
+              amount: parseFloat(sponsorForm.amount),
+              logoUrl: sponsorForm.logoUrl || undefined,
+              websiteUrl: sponsorForm.websiteUrl || undefined,
+              mapUrl: sponsorForm.mapUrl || undefined,
+              phone: sponsorForm.phone || undefined,
+              notes: sponsorForm.notes || undefined
+            }
+          })
         });
-        showToast('Corporate sponsor registered successfully! Added to Gratitude Wall.', 'success');
-        fetchFinanceData();
-        if (result?.item) {
-          setSelectedReceipt(result.item);
+
+        const result = await res.json();
+        if (res.ok) {
+          setShowAddSponsorModal(false);
+          setEditingSponsorId(null);
+          setSponsorLogoFile(null);
+          setSponsorForm({
+            businessName: '',
+            contactPerson: '',
+            phone: '',
+            memberArea: 'General Area',
+            category: 'GOLD',
+            amount: '10000',
+            logoUrl: '',
+            websiteUrl: '',
+            mapUrl: '',
+            notes: ''
+          });
+          showToast(result.message || 'Corporate sponsor updated successfully!', 'success');
+          fetchFinanceData();
+        } else {
+          showToast(result.error || 'Failed to update sponsor', 'error');
         }
       } else {
-        showToast(result.error || 'Failed to register sponsor', 'error');
+        // CREATE SPONSOR ROUTE
+        const res = await fetch('/api/finance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'ADD_CONTRIBUTION',
+            data: {
+              memberName: sponsorForm.businessName.trim(),
+              memberArea: sponsorForm.memberArea || 'General Area',
+              amount: parseFloat(sponsorForm.amount),
+              paymentMode: 'BANK_TRANSFER',
+              collectorId: session?.user?.email || 'usr-2',
+              collectorName: session?.user?.name || 'Collector',
+              note: sponsorForm.notes || `Corporate Sponsor - Contact: ${sponsorForm.contactPerson || 'N/A'} (${sponsorForm.phone || 'N/A'})`,
+              isPrivate: true,
+              isSponsorship: true,
+              sponsorCategory: sponsorForm.category,
+              sponsorLogoUrl: sponsorForm.logoUrl || undefined,
+              sponsorWebsiteUrl: sponsorForm.websiteUrl || undefined,
+              sponsorMapUrl: sponsorForm.mapUrl || undefined,
+              sponsorPhone: sponsorForm.phone || undefined
+            }
+          })
+        });
+
+        const result = await res.json();
+        if (res.ok) {
+          setShowAddSponsorModal(false);
+          setSponsorForm({
+            businessName: '',
+            contactPerson: '',
+            phone: '',
+            memberArea: 'General Area',
+            category: 'GOLD',
+            amount: '10000',
+            logoUrl: '',
+            websiteUrl: '',
+            mapUrl: '',
+            notes: ''
+          });
+          showToast('Corporate sponsor registered successfully! Added to Gratitude Wall.', 'success');
+          fetchFinanceData();
+        } else {
+          showToast(result.error || 'Failed to register sponsor', 'error');
+        }
       }
     } catch (err: any) {
-      showToast(`Error: ${err?.message || 'Failed to submit sponsorship'}`, 'error');
+      showToast(err.message || 'Failed to save sponsor details', 'error');
     } finally {
       setIsSubmittingContribution(false);
     }
@@ -2160,9 +2252,18 @@ export default function HomePage() {
                                   <span>Google Maps Location</span>
                                 </a>
                               )}
+                              {isSuperAdmin && (
+                                <button
+                                  onClick={() => handleOpenEditSponsor(sp)}
+                                  className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black flex items-center gap-1 shadow-xs"
+                                  title="Edit Corporate Sponsor Details & Logo"
+                                >
+                                  ✏️ Edit
+                                </button>
+                              )}
                               <button
                                 onClick={() => setSelectedReceipt(sp)}
-                                className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black flex items-center gap-1 shadow-xs ml-auto"
+                                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold flex items-center gap-1 shadow-xs ml-auto"
                               >
                                 <Printer className="w-3.5 h-3.5" />
                                 <span>Voucher</span>
@@ -2209,6 +2310,15 @@ export default function HomePage() {
                                 </a>
                               ) : <span className="text-slate-400">Local Supporter</span>}
 
+                              {isSuperAdmin && (
+                                <button
+                                  onClick={() => handleOpenEditSponsor(sp)}
+                                  className="px-2 py-1 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 font-extrabold hover:bg-amber-200"
+                                  title="Edit Corporate Sponsor"
+                                >
+                                  ✏️ Edit
+                                </button>
+                              )}
                               <button
                                 onClick={() => setSelectedReceipt(sp)}
                                 className="p-1.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100"
@@ -3904,10 +4014,13 @@ export default function HomePage() {
             <div className="flex items-center justify-between border-b border-amber-100 pb-3">
               <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
                 <Award className="w-5 h-5 text-amber-500" />
-                <span>Register Corporate Sponsor</span>
+                <span>{editingSponsorId ? 'Edit Corporate Sponsor Details & Logo' : 'Register Corporate Sponsor'}</span>
               </h3>
               <button
-                onClick={() => setShowAddSponsorModal(false)}
+                onClick={() => {
+                  setShowAddSponsorModal(false);
+                  setEditingSponsorId(null);
+                }}
                 className="text-slate-400 hover:text-slate-600 font-bold text-base"
               >
                 ✕
@@ -3994,14 +4107,36 @@ export default function HomePage() {
                 />
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Business Logo Image URL (Optional)</label>
+              {/* Logo File Selector & Image URL Input */}
+              <div className="space-y-1">
+                <label className="block font-bold text-slate-700 mb-1">Business Logo Image (Upload or URL)</label>
+                <div className="bg-slate-50 border border-dashed border-slate-300 hover:border-amber-500 rounded-xl p-3 text-center cursor-pointer transition relative">
+                  <input
+                    type="file"
+                    accept="image/png, image/jpeg, image/jpg, image/webp, image/svg+xml"
+                    onChange={handleSponsorLogoSelect}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  {sponsorForm.logoUrl ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <img src={sponsorForm.logoUrl} alt="Logo" className="w-8 h-8 rounded-lg object-cover border border-amber-400 bg-white" />
+                      <span className="text-[11px] font-bold text-emerald-700">✓ Logo Image Loaded</span>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] font-bold text-slate-600">📁 Click to upload logo image (PNG, JPG, WEBP - Max 2MB)</p>
+                  )}
+                </div>
+
+                {sponsorLogoError && (
+                  <p className="text-[10px] font-bold text-rose-600 pt-0.5">{sponsorLogoError}</p>
+                )}
+
                 <input
                   type="url"
-                  placeholder="https://example.com/logo.png"
+                  placeholder="Or paste image URL: https://example.com/logo.png"
                   value={sponsorForm.logoUrl}
                   onChange={(e) => setSponsorForm({ ...sponsorForm, logoUrl: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-800 focus:outline-none focus:border-amber-500 mt-1"
                 />
               </div>
 
