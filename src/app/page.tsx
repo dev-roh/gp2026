@@ -30,7 +30,11 @@ import {
   ChevronLeft,
   ChevronRight,
   MoreVertical,
-  Loader2
+  Loader2,
+  Award,
+  Building2,
+  ExternalLink,
+  MapPin
 } from 'lucide-react';
 import { AppSettings, User as DbUser, ProgrammeItem } from '@/lib/db';
 
@@ -77,6 +81,12 @@ interface Contribution {
   collectorName: string;
   status: 'APPROVED' | 'PENDING_COLLECTOR_APPROVAL' | 'PENDING_SUPER_ADMIN_APPROVAL' | 'REJECTED';
   isPrivate?: boolean;
+  isSponsorship?: boolean;
+  sponsorCategory?: 'PLATINUM' | 'GOLD' | 'SILVER' | 'BRONZE';
+  sponsorLogoUrl?: string;
+  sponsorWebsiteUrl?: string;
+  sponsorMapUrl?: string;
+  sponsorPhone?: string;
 }
 
 interface UserActivity {
@@ -295,7 +305,7 @@ export default function HomePage() {
     }
   }, []);
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'programmes' | 'collectors' | 'contributions' | 'expenses' | 'reimbursements' | 'approvals' | 'admin' | 'branding' | 'activity'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'programmes' | 'sponsors' | 'collectors' | 'contributions' | 'expenses' | 'reimbursements' | 'approvals' | 'admin' | 'branding' | 'activity'>('overview');
   const [userActivities, setUserActivities] = useState<UserActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -307,6 +317,21 @@ export default function HomePage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [handovers, setHandovers] = useState<Handover[]>([]);
   const [programmes, setProgrammes] = useState<ProgrammeItem[]>([]);
+
+  // Corporate Sponsorship Modal Form State
+  const [showAddSponsorModal, setShowAddSponsorModal] = useState(false);
+  const [sponsorForm, setSponsorForm] = useState({
+    businessName: '',
+    contactPerson: '',
+    phone: '',
+    memberArea: 'General Area',
+    category: 'GOLD' as 'PLATINUM' | 'GOLD' | 'SILVER' | 'BRONZE',
+    amount: '10000',
+    logoUrl: '',
+    websiteUrl: '',
+    mapUrl: '',
+    notes: ''
+  });
 
   // Hydrate initial state from localStorage cache for instant 0ms rendering
   useEffect(() => {
@@ -1078,6 +1103,65 @@ export default function HomePage() {
     }
   };
 
+  const handleAddSponsor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sponsorForm.businessName || !sponsorForm.amount || isSubmittingContribution) return;
+
+    try {
+      setIsSubmittingContribution(true);
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'ADD_CONTRIBUTION',
+          data: {
+            memberName: sponsorForm.businessName.trim(),
+            memberArea: sponsorForm.memberArea || 'General Area',
+            amount: parseFloat(sponsorForm.amount),
+            paymentMode: 'BANK_TRANSFER',
+            collectorId: session?.user?.email || 'usr-2',
+            collectorName: session?.user?.name || 'Collector',
+            note: sponsorForm.notes || `Corporate Sponsor - Contact: ${sponsorForm.contactPerson || 'N/A'} (${sponsorForm.phone || 'N/A'})`,
+            isSponsorship: true,
+            sponsorCategory: sponsorForm.category,
+            sponsorLogoUrl: sponsorForm.logoUrl || undefined,
+            sponsorWebsiteUrl: sponsorForm.websiteUrl || undefined,
+            sponsorMapUrl: sponsorForm.mapUrl || undefined,
+            sponsorPhone: sponsorForm.phone || undefined
+          }
+        })
+      });
+
+      const result = await res.json();
+      if (res.ok) {
+        setShowAddSponsorModal(false);
+        setSponsorForm({
+          businessName: '',
+          contactPerson: '',
+          phone: '',
+          memberArea: 'General Area',
+          category: 'GOLD',
+          amount: '10000',
+          logoUrl: '',
+          websiteUrl: '',
+          mapUrl: '',
+          notes: ''
+        });
+        showToast('Corporate sponsor registered successfully! Added to Gratitude Wall.', 'success');
+        fetchFinanceData();
+        if (result?.item) {
+          setSelectedReceipt(result.item);
+        }
+      } else {
+        showToast(result.error || 'Failed to register sponsor', 'error');
+      }
+    } catch (err: any) {
+      showToast(`Error: ${err?.message || 'Failed to submit sponsorship'}`, 'error');
+    } finally {
+      setIsSubmittingContribution(false);
+    }
+  };
+
   const handleAddContribution = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!contribForm.memberName || !contribForm.amount || isSubmittingContribution) return;
@@ -1568,6 +1652,13 @@ export default function HomePage() {
           <span>Schedule & Media</span>
         </button>
         <button 
+          onClick={() => setActiveTab('sponsors')} 
+          className={`flex-1 py-2 px-3.5 rounded-xl text-center whitespace-nowrap transition flex items-center justify-center space-x-1 ${activeTab === 'sponsors' ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-sm font-extrabold' : 'text-amber-800 hover:text-amber-950 font-bold'}`}
+        >
+          <Award className="w-3.5 h-3.5 text-amber-500" />
+          <span>Sponsors & Wall</span>
+        </button>
+        <button 
           onClick={() => setActiveTab('contributions')} 
           className={`flex-1 py-2 px-3.5 rounded-xl text-center whitespace-nowrap transition ${activeTab === 'contributions' ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
         >
@@ -1810,6 +1901,268 @@ export default function HomePage() {
           )}
         </div>
       )}
+
+      {/* TAB CONTENT: Corporate Sponsors & Gratitude Wall */}
+      {activeTab === 'sponsors' && (() => {
+        const sponsoredContributions = contributions.filter(c => c.isSponsorship && c.status === 'APPROVED');
+        const platinumSponsors = sponsoredContributions.filter(c => c.sponsorCategory === 'PLATINUM');
+        const goldSponsors = sponsoredContributions.filter(c => c.sponsorCategory === 'GOLD');
+        const silverSponsors = sponsoredContributions.filter(c => c.sponsorCategory === 'SILVER');
+        const bronzeSponsors = sponsoredContributions.filter(c => c.sponsorCategory === 'BRONZE' || !c.sponsorCategory);
+
+        return (
+          <div className="space-y-5">
+            {/* Business Pitch Hero Banner */}
+            <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 rounded-3xl p-6 shadow-xl relative overflow-hidden space-y-3">
+              <div className="flex justify-between items-start">
+                <div className="space-y-1 max-w-lg">
+                  <span className="text-[10px] font-black tracking-widest uppercase bg-slate-950 text-amber-400 px-3 py-1 rounded-full inline-block shadow-sm">
+                    ✨ Partner & Sponsor Hub 2026
+                  </span>
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-950 leading-tight">
+                    Showcase Your Brand to Thousands of Local Devotees
+                  </h2>
+                  <p className="text-xs font-semibold text-slate-900 leading-relaxed">
+                    Partner with Ganesh Puja 2026! Gain high-visibility brand exposure across our digital PWA portal, LED pandal banners, VIP Aarti invitations, and digital PDF receipts.
+                  </p>
+                </div>
+                <div className="text-4xl hidden sm:block shrink-0">🚩🪔</div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 pt-2">
+                <button
+                  onClick={() => setShowAddSponsorModal(true)}
+                  className="px-4 py-2.5 rounded-2xl bg-slate-950 hover:bg-slate-900 text-amber-400 font-black text-xs shadow-lg transition transform active:scale-95 flex items-center space-x-1.5"
+                >
+                  <PlusCircle className="w-4 h-4 text-amber-400" />
+                  <span>Register Corporate Sponsor</span>
+                </button>
+                <a
+                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                    `🚩 *Ganesh Puja 2026 - Corporate Sponsorship Invitation* 🐘\n\nPartner with our festival and display your brand logo to thousands of local & out-of-town patrons!\n\n👑 Platinum Sponsor: ₹25,000+\n🥇 Gold Sponsor: ₹10,000+\n🥈 Silver Sponsor: ₹5,000+\n\nView tier details & register online: https://gp2026.luhurachati.com`
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2.5 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs shadow-md transition flex items-center space-x-1.5"
+                >
+                  <Share2 className="w-4 h-4" />
+                  <span>Share Sponsor Deck (WhatsApp)</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Sponsorship Tiers Breakdown Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              {/* Platinum Tier */}
+              <div className="bg-slate-950 border-2 border-amber-400 rounded-3xl p-5 text-slate-100 shadow-xl space-y-3 relative overflow-hidden">
+                <div className="flex justify-between items-center border-b border-slate-800 pb-2.5">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xl">👑</span>
+                    <div>
+                      <h4 className="font-black text-amber-400 text-sm">Platinum Sponsor</h4>
+                      <p className="text-[10px] text-slate-400 font-semibold">Tier 1 Premium Branding</p>
+                    </div>
+                  </div>
+                  <span className="font-black text-base text-amber-400">₹25,000+</span>
+                </div>
+                <ul className="space-y-1.5 text-slate-300 font-medium text-[11px]">
+                  <li className="flex items-center gap-1.5 text-amber-300">✓ Top visual logo placement on PWA & LED Screens</li>
+                  <li className="flex items-center gap-1.5">✓ Partner logo on all official digital PDF Receipts</li>
+                  <li className="flex items-center gap-1.5">✓ Dedicated WhatsApp & social media shout-outs</li>
+                  <li className="flex items-center gap-1.5">✓ Special VIP Pass for Maha Aarti & Havan</li>
+                </ul>
+              </div>
+
+              {/* Gold Tier */}
+              <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border-2 border-amber-300 rounded-3xl p-5 shadow-sm space-y-3">
+                <div className="flex justify-between items-center border-b border-amber-200/80 pb-2.5">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xl">🥇</span>
+                    <div>
+                      <h4 className="font-black text-amber-900 text-sm">Gold Sponsor</h4>
+                      <p className="text-[10px] text-slate-600 font-semibold">Tier 2 Prime Visibility</p>
+                    </div>
+                  </div>
+                  <span className="font-black text-base text-orange-600">₹10,000+</span>
+                </div>
+                <ul className="space-y-1.5 text-slate-700 font-medium text-[11px]">
+                  <li className="flex items-center gap-1.5 text-amber-900 font-bold">✓ Prominent logo on Digital Gratitude Wall</li>
+                  <li className="flex items-center gap-1.5">✓ Clickable Google Maps & shop website link</li>
+                  <li className="flex items-center gap-1.5">✓ Pandal banner logo placement</li>
+                </ul>
+              </div>
+
+              {/* Silver Tier */}
+              <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-3">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-2.5">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xl">🥈</span>
+                    <div>
+                      <h4 className="font-black text-slate-800 text-sm">Silver Sponsor</h4>
+                      <p className="text-[10px] text-slate-500 font-semibold">Community Brand Supporter</p>
+                    </div>
+                  </div>
+                  <span className="font-black text-base text-slate-700">₹5,000+</span>
+                </div>
+                <ul className="space-y-1.5 text-slate-600 font-medium text-[11px]">
+                  <li className="flex items-center gap-1.5 text-slate-900 font-semibold">✓ Business name listed in Digital Directory</li>
+                  <li className="flex items-center gap-1.5">✓ Digital PDF thank-you certificate</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* DIGITAL GRATITUDE WALL & SPONSORS GALLERY */}
+            <div className="bg-white border border-amber-200/80 rounded-3xl p-6 shadow-sm space-y-5">
+              <div className="border-b border-amber-100 pb-3 flex justify-between items-center flex-wrap gap-2">
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                    <Award className="w-5 h-5 text-amber-500" />
+                    <span>Official Sponsors Wall of Gratitude ({sponsoredContributions.length})</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">Heartfelt gratitude to our festival business patrons supporting Ganesh Puja 2026</p>
+                </div>
+                {isCollector && (
+                  <button
+                    onClick={() => setShowAddSponsorModal(true)}
+                    className="px-3.5 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-xs"
+                  >
+                    + Add Sponsor
+                  </button>
+                )}
+              </div>
+
+              {sponsoredContributions.length === 0 ? (
+                <div className="py-10 text-center text-xs text-slate-500 space-y-2 bg-amber-50/40 rounded-2xl border border-amber-200/60 p-6">
+                  <p className="font-black text-slate-800 text-sm">No corporate sponsors registered yet.</p>
+                  <p className="text-xs text-slate-600 max-w-md mx-auto">
+                    Click "Register Corporate Sponsor" above to log local businesses, shops, and corporate partners contributing to Ganesh Puja 2026.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* PLATINUM SPONSORS DISPLAY */}
+                  {platinumSponsors.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2 text-amber-500 font-black text-xs uppercase tracking-widest">
+                        <span>👑 Platinum Partners</span>
+                        <div className="flex-1 h-px bg-amber-200" />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {platinumSponsors.map((sp) => (
+                          <div key={sp.id} className="bg-slate-950 border-2 border-amber-400 rounded-3xl p-5 text-white shadow-lg space-y-3 flex flex-col justify-between">
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-start gap-2">
+                                <div className="flex items-center space-x-3">
+                                  {sp.sponsorLogoUrl ? (
+                                    <img src={sp.sponsorLogoUrl} alt={sp.memberName} className="w-12 h-12 rounded-2xl object-cover border border-amber-400 shrink-0 bg-white" />
+                                  ) : (
+                                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-orange-500 text-slate-950 font-black text-lg flex items-center justify-center shrink-0">
+                                      {sp.memberName.charAt(0)}
+                                    </div>
+                                  )}
+                                  <div>
+                                    <h4 className="font-black text-slate-100 text-base leading-tight">{sp.memberName}</h4>
+                                    <span className="text-[10px] text-amber-400 font-bold bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-400/30">
+                                      👑 PLATINUM SPONSOR
+                                    </span>
+                                  </div>
+                                </div>
+                                <span className="font-black text-emerald-400 text-base">₹{sp.amount.toLocaleString()}</span>
+                              </div>
+                              {sp.note && <p className="text-xs text-slate-300 font-medium italic">"{sp.note}"</p>}
+                            </div>
+
+                            <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-800 text-[11px]">
+                              {sp.sponsorWebsiteUrl && (
+                                <a
+                                  href={sp.sponsorWebsiteUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold border border-slate-700 flex items-center gap-1 shadow-xs"
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                  <span>Website</span>
+                                </a>
+                              )}
+                              {sp.sponsorMapUrl && (
+                                <a
+                                  href={sp.sponsorMapUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-orange-300 font-bold border border-slate-700 flex items-center gap-1 shadow-xs"
+                                >
+                                  <MapPin className="w-3.5 h-3.5 text-orange-400" />
+                                  <span>Google Maps Location</span>
+                                </a>
+                              )}
+                              <button
+                                onClick={() => setSelectedReceipt(sp)}
+                                className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black flex items-center gap-1 shadow-xs ml-auto"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                                <span>Voucher</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* GOLD & SILVER SPONSORS DISPLAY */}
+                  {(goldSponsors.length > 0 || silverSponsors.length > 0 || bronzeSponsors.length > 0) && (
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2 text-slate-700 font-black text-xs uppercase tracking-widest">
+                        <span>🥇 Corporate & Local Business Partners</span>
+                        <div className="flex-1 h-px bg-slate-200" />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                        {[...goldSponsors, ...silverSponsors, ...bronzeSponsors].map((sp) => (
+                          <div key={sp.id} className="p-4 rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50/40 to-white shadow-xs space-y-2.5 flex flex-col justify-between">
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${sp.sponsorCategory === 'GOLD' ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-slate-100 text-slate-700 border border-slate-200'}`}>
+                                  {sp.sponsorCategory === 'GOLD' ? '🥇 GOLD' : '🥈 SILVER'}
+                                </span>
+                                <span className="font-black text-emerald-600 text-sm">₹{sp.amount.toLocaleString()}</span>
+                              </div>
+                              <p className="font-extrabold text-slate-900 text-sm leading-tight">{sp.memberName}</p>
+                              {sp.note && <p className="text-[11px] text-slate-600 italic">"{sp.note}"</p>}
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
+                              {sp.sponsorMapUrl ? (
+                                <a
+                                  href={sp.sponsorMapUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-orange-600 font-bold hover:underline flex items-center gap-1"
+                                >
+                                  <MapPin className="w-3.5 h-3.5" />
+                                  <span>View Shop</span>
+                                </a>
+                              ) : <span className="text-slate-400">Local Supporter</span>}
+
+                              <button
+                                onClick={() => setSelectedReceipt(sp)}
+                                className="p-1.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100"
+                                title="View Receipt"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* TAB CONTENT: Pending Approvals Queue */}
       {activeTab === 'approvals' && (
@@ -3475,6 +3828,153 @@ export default function HomePage() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Register Corporate Sponsor */}
+      {showAddSponsorModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-amber-200 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-amber-100 pb-3">
+              <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                <Award className="w-5 h-5 text-amber-500" />
+                <span>Register Corporate Sponsor</span>
+              </h3>
+              <button
+                onClick={() => setShowAddSponsorModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-base"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddSponsor} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Company / Shop / Business Name *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Radhe Sweets & Bakers"
+                  value={sponsorForm.businessName}
+                  onChange={(e) => setSponsorForm({ ...sponsorForm, businessName: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Sponsorship Tier *</label>
+                  <select
+                    value={sponsorForm.category}
+                    onChange={(e) => {
+                      const cat = e.target.value as any;
+                      const defaultAmt = cat === 'PLATINUM' ? '25000' : cat === 'GOLD' ? '10000' : cat === 'SILVER' ? '5000' : '2500';
+                      setSponsorForm({ ...sponsorForm, category: cat, amount: defaultAmt });
+                    }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="PLATINUM">👑 PLATINUM (₹25,000+)</option>
+                    <option value="GOLD">🥇 GOLD (₹10,000+)</option>
+                    <option value="SILVER">🥈 SILVER (₹5,000+)</option>
+                    <option value="BRONZE">🥉 BRONZE (₹2,500+)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Sponsorship Amount (₹) *</label>
+                  <input
+                    type="number"
+                    placeholder="10000"
+                    value={sponsorForm.amount}
+                    onChange={(e) => setSponsorForm({ ...sponsorForm, amount: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-emerald-600 text-sm focus:outline-none focus:border-amber-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Contact Person Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Ramesh Agarwal"
+                    value={sponsorForm.contactPerson}
+                    onChange={(e) => setSponsorForm({ ...sponsorForm, contactPerson: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Contact Phone</label>
+                  <input
+                    type="text"
+                    placeholder="+91 9876543210"
+                    value={sponsorForm.phone}
+                    onChange={(e) => setSponsorForm({ ...sponsorForm, phone: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Google Maps Location Link (For Devotees)</label>
+                <input
+                  type="url"
+                  placeholder="https://maps.google.com/?q=RadheSweets"
+                  value={sponsorForm.mapUrl}
+                  onChange={(e) => setSponsorForm({ ...sponsorForm, mapUrl: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Business Logo Image URL (Optional)</label>
+                <input
+                  type="url"
+                  placeholder="https://example.com/logo.png"
+                  value={sponsorForm.logoUrl}
+                  onChange={(e) => setSponsorForm({ ...sponsorForm, logoUrl: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Sponsorship Note / Special Message</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Best wishes for Ganesh Puja 2026!"
+                  value={sponsorForm.notes}
+                  onChange={(e) => setSponsorForm({ ...sponsorForm, notes: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowAddSponsorModal(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingContribution}
+                  className="px-5 py-2 text-xs font-black text-slate-950 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 rounded-xl shadow-md transition disabled:opacity-50 flex items-center space-x-1"
+                >
+                  {isSubmittingContribution ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-950" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Register & Publish Sponsor</span>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

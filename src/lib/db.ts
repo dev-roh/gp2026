@@ -34,6 +34,15 @@ export interface UserRoleAssignment {
   updatedAt: string;
 }
 
+export interface SponsorTier {
+  id: string;
+  name: string;
+  minAmount: number;
+  badge: string;
+  color: string;
+  benefits: string[];
+}
+
 export interface Contribution {
   id: string;
   amount: number;
@@ -50,6 +59,12 @@ export interface Contribution {
   approverEmail?: string;
   isSelfContribution?: boolean;
   isPrivate?: boolean;
+  isSponsorship?: boolean;
+  sponsorCategory?: 'PLATINUM' | 'GOLD' | 'SILVER' | 'BRONZE';
+  sponsorLogoUrl?: string;
+  sponsorWebsiteUrl?: string;
+  sponsorMapUrl?: string;
+  sponsorPhone?: string;
 }
 
 export interface CollectorTransfer {
@@ -309,7 +324,13 @@ export async function getDbAsync(): Promise<DatabaseSchema> {
           approverEmail: c.approver_email || undefined,
           isSelfContribution: c.is_self_contribution,
           isPrivate: c.is_private,
-          note: c.note || undefined
+          note: c.note || undefined,
+          isSponsorship: c.is_sponsorship || false,
+          sponsorCategory: c.sponsor_category || undefined,
+          sponsorLogoUrl: c.sponsor_logo_url || undefined,
+          sponsorWebsiteUrl: c.sponsor_website_url || undefined,
+          sponsorMapUrl: c.sponsor_map_url || undefined,
+          sponsorPhone: c.sponsor_phone || undefined
         }));
 
         const expenses: Expense[] = (expensesRes.data || []).map(e => ({
@@ -502,6 +523,12 @@ export async function saveDbAsync(data: DatabaseSchema): Promise<void> {
           is_self_contribution: Boolean(c.isSelfContribution),
           is_private: Boolean(c.isPrivate),
           note: c.note || null,
+          is_sponsorship: Boolean(c.isSponsorship),
+          sponsor_category: c.sponsorCategory || null,
+          sponsor_logo_url: c.sponsorLogoUrl || null,
+          sponsor_website_url: c.sponsorWebsiteUrl || null,
+          sponsor_map_url: c.sponsorMapUrl || null,
+          sponsor_phone: c.sponsorPhone || null,
           created_at: c.date || new Date().toISOString()
         }));
         await supabase.from('contributions').upsert(contribsPayload);
