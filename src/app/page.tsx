@@ -2836,8 +2836,8 @@ export default function HomePage() {
 
       {/* DIGITAL RECEIPT MODAL */}
       {selectedReceipt && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-amber-500/30 w-full max-w-xs rounded-2xl p-5 shadow-2xl space-y-4 text-center">
+        <div className="receipt-modal-overlay fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="receipt-card-print bg-slate-900 border border-amber-500/30 w-full max-w-xs rounded-2xl p-5 shadow-2xl space-y-4 text-center">
             {settings.logoUrl ? (
               <img src={settings.logoUrl} alt="Logo" className="w-12 h-12 rounded-full mx-auto border border-amber-500/30 object-cover shadow-lg" />
             ) : (
@@ -2892,7 +2892,7 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="space-y-2 pt-1">
+            <div className="print-hide space-y-2 pt-1">
               <button 
                 onClick={() => window.print()}
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 text-xs font-extrabold flex items-center justify-center space-x-1.5 shadow-lg"
