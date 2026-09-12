@@ -214,12 +214,17 @@ export default function SponsorsPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative px-4 py-10 sm:py-14 text-center overflow-hidden bg-slate-950 border-b border-slate-900">
+      <section className="relative px-4 py-12 sm:py-16 text-center overflow-hidden bg-slate-950 border-b border-slate-900">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-amber-500/20 via-orange-600/10 to-transparent pointer-events-none" />
-        <div className="max-w-4xl mx-auto space-y-4 relative z-10">
-          <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-400/30 text-amber-400 text-xs font-black uppercase tracking-widest shadow-sm">
+        
+        {/* Festive Background Glow Accents */}
+        <div className="absolute top-10 left-1/4 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-5 right-1/4 w-72 h-72 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="max-w-4xl mx-auto space-y-6 relative z-10">
+          <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-slate-900/90 border border-amber-400/40 text-amber-400 text-xs font-black uppercase tracking-widest shadow-md">
             <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
-            <span>Official Festival Sponsorship & Gratitude Deck</span>
+            <span>🚩 Official Festival Sponsorship & Gratitude Deck 2026 🪔</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-black text-slate-100 tracking-tight leading-tight">
@@ -227,11 +232,27 @@ export default function SponsorsPage() {
           </h1>
 
           <p className="text-sm sm:text-base text-slate-300 font-medium max-w-2xl mx-auto leading-relaxed">
-            Sponsors-First Philosophy: Celebrating local business leaders powering our community festival. Gain high-impact brand exposure across LED pandal screens, digital receipts, and map links!
+            Sponsors-First Philosophy: Celebrating local business leaders powering our community festival. Gain high-impact brand exposure across LED pandal screens, digital PDF receipts, and map location links!
           </p>
 
+          {/* Key Impact Stats Bar */}
+          <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto py-3 px-4 rounded-2xl bg-slate-900/80 border border-amber-400/20 text-xs backdrop-blur-xs shadow-inner">
+            <div>
+              <p className="font-black text-amber-400 text-base sm:text-lg">5,000+</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase">Expected Footfall</p>
+            </div>
+            <div className="border-x border-slate-800 px-2">
+              <p className="font-black text-amber-400 text-base sm:text-lg">100%</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase">Digital Coverage</p>
+            </div>
+            <div>
+              <p className="font-black text-amber-400 text-base sm:text-lg">LED & PDF</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase">Logo Branding</p>
+            </div>
+          </div>
+
           {/* Action CTAs */}
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-3">
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <button
               onClick={scrollToPackages}
               className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 text-slate-950 font-black text-sm shadow-xl hover:scale-105 transition transform active:scale-95 flex items-center space-x-2 border border-amber-300/60"
@@ -309,10 +330,10 @@ export default function SponsorsPage() {
             {filteredList.map(s => (
               <div
                 key={s.id}
-                className={`rounded-3xl p-6 shadow-xl space-y-4 flex flex-col justify-between border transition ${
-                  s.sponsorCategory === 'PLATINUM' ? 'bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-amber-400' :
-                  s.sponsorCategory === 'GOLD' ? 'bg-slate-900 border border-amber-400/50' :
-                  'bg-slate-900 border border-slate-800'
+                className={`rounded-3xl p-6 shadow-xl space-y-4 flex flex-col justify-between border transition duration-300 transform hover:-translate-y-1 hover:shadow-2xl ${
+                  s.sponsorCategory === 'PLATINUM' ? 'bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border-2 border-amber-400 shadow-amber-500/10' :
+                  s.sponsorCategory === 'GOLD' ? 'bg-slate-900 border border-amber-400/50 hover:border-amber-400 shadow-amber-500/5' :
+                  'bg-slate-900 border border-slate-800 hover:border-slate-700'
                 }`}
               >
                 <div className="space-y-3">
@@ -322,7 +343,7 @@ export default function SponsorsPage() {
                         <img
                           src={s.sponsorLogoUrl}
                           alt={s.businessName}
-                          className="w-14 h-14 rounded-2xl object-cover border border-amber-400 shrink-0 bg-white p-0.5"
+                          className="w-14 h-14 rounded-2xl object-cover border border-amber-400 shrink-0 bg-white p-0.5 shadow-md"
                         />
                       ) : (
                         <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-400 to-orange-500 text-slate-950 font-black text-xl flex items-center justify-center shrink-0 shadow-md">
@@ -331,19 +352,19 @@ export default function SponsorsPage() {
                       )}
                       <div>
                         <h3 className="font-black text-slate-100 text-base leading-tight">{s.businessName}</h3>
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md inline-block mt-1 ${
-                          s.sponsorCategory === 'PLATINUM' ? 'bg-amber-400 text-slate-950' :
-                          s.sponsorCategory === 'GOLD' ? 'bg-amber-200 text-amber-900' :
-                          'bg-slate-700 text-slate-200'
+                        <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full inline-block mt-1 uppercase tracking-wider shadow-xs ${
+                          s.sponsorCategory === 'PLATINUM' ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 border border-amber-300' :
+                          s.sponsorCategory === 'GOLD' ? 'bg-amber-200 text-amber-950 border border-amber-300' :
+                          'bg-slate-800 text-slate-200 border border-slate-700'
                         }`}>
-                          {s.sponsorCategory || 'SPONSOR'}
+                          {s.sponsorCategory === 'PLATINUM' ? '👑 PLATINUM' : s.sponsorCategory === 'GOLD' ? '🥇 GOLD' : s.sponsorCategory === 'SILVER' ? '🥈 SILVER' : '🥉 BRONZE'}
                         </span>
                       </div>
                     </div>
                   </div>
 
                   {s.note && (
-                    <p className="text-xs text-slate-300 font-medium italic bg-slate-950/50 p-3 rounded-2xl border border-slate-800">
+                    <p className="text-xs text-slate-300 font-medium italic bg-slate-950/70 p-3.5 rounded-2xl border border-slate-800/80 leading-relaxed">
                       "{s.note.replace(/^\[Sponsor Note\]:\s*/, '')}"
                     </p>
                   )}
@@ -355,7 +376,7 @@ export default function SponsorsPage() {
                       href={s.sponsorWebsiteUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-amber-400 hover:underline flex items-center gap-1 font-bold"
+                      className="px-2.5 py-1 rounded-xl bg-amber-400/10 hover:bg-amber-400/20 text-amber-400 hover:underline flex items-center gap-1 font-bold border border-amber-400/30 transition"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       <span>Website</span>
@@ -366,14 +387,14 @@ export default function SponsorsPage() {
                       href={s.sponsorMapUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-emerald-400 hover:underline flex items-center gap-1 font-bold"
+                      className="px-2.5 py-1 rounded-xl bg-emerald-400/10 hover:bg-emerald-400/20 text-emerald-400 hover:underline flex items-center gap-1 font-bold border border-emerald-400/30 transition"
                     >
                       <MapPin className="w-3.5 h-3.5" />
                       <span>Shop Map</span>
                     </a>
                   )}
                   {s.sponsorPhone && (
-                    <a href={`tel:${s.sponsorPhone}`} className="text-slate-300 hover:underline flex items-center gap-1">
+                    <a href={`tel:${s.sponsorPhone}`} className="text-slate-300 hover:text-white flex items-center gap-1 font-medium">
                       <Phone className="w-3.5 h-3.5 text-slate-400" />
                       <span>{s.sponsorPhone}</span>
                     </a>
