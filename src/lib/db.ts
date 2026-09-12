@@ -801,11 +801,14 @@ export function saveDb(data: DatabaseSchema) {
   }
 }
 
-export function getUserRole(email: string | null | undefined): 'SUPER_ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER' | 'VIEW_ONLY' {
+export function getUserRole(email: string | null | undefined): 'SUPER_ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER' | 'SPONSOR' | 'VIEW_ONLY' {
   if (!email) return 'VIEW_ONLY';
   if (SUPER_ADMIN_EMAILS.some(e => e.toLowerCase() === email.toLowerCase())) return 'SUPER_ADMIN';
 
   const db = getDb();
+  const user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  if (user?.role) return user.role;
+
   const assignment = db.roleAssignments[email.toLowerCase()];
   if (assignment) {
     return assignment.role;
