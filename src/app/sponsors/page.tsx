@@ -201,11 +201,9 @@ export default function SponsorsPage() {
       {/* Header Bar */}
       <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-amber-500/30 px-4 py-3 shadow-md">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <span className="text-sm sm:text-base font-black text-amber-400">
-              Ganesh Puja 2026
-            </span>
-          </div>
+          <Link href="/" className="flex items-center space-x-2 text-amber-400 hover:text-amber-300 font-black text-sm sm:text-base transition">
+            <span>🪔 Ganesh Puja 2026</span>
+          </Link>
           <div className="flex items-center space-x-2">
             <span className="text-[10px] font-black uppercase tracking-widest bg-amber-400 text-slate-950 px-3 py-1 rounded-full shadow-xs">
               Sponsors Hub 2026
