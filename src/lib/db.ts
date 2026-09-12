@@ -19,7 +19,7 @@ export interface User {
   name: string;
   email: string;
   image?: string;
-  role: 'SUPER_ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER' | 'VIEW_ONLY';
+  role: 'SUPER_ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER' | 'SPONSOR' | 'VIEW_ONLY';
   area?: string;
   phone?: string;
   isManual?: boolean;
@@ -29,7 +29,7 @@ export interface User {
 
 export interface UserRoleAssignment {
   email: string;
-  role: 'SUPER_ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER' | 'VIEW_ONLY';
+  role: 'SUPER_ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER' | 'SPONSOR' | 'VIEW_ONLY';
   assignedBy: string;
   updatedAt: string;
 }

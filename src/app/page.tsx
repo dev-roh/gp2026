@@ -2004,7 +2004,7 @@ export default function HomePage() {
                 </button>
                 <a
                   href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                    `🚩 *Ganesh Puja 2026 - Corporate Sponsorship Invitation* 🐘\n\nPartner with our festival and display your brand logo to thousands of local & out-of-town patrons!\n\n👑 Platinum Sponsor: ₹25,000+\n🥇 Gold Sponsor: ₹10,000+\n🥈 Silver Sponsor: ₹5,000+\n\nView tier details & register online: https://gp2026.luhurachati.com`
+                    `🚩 *Ganesh Puja 2026 - Corporate Sponsorship Invitation* 🐘\n\nPartner with our festival and display your brand logo to thousands of local & out-of-town patrons!\n\n👑 Platinum Sponsor: ₹25,000+\n🥇 Gold Sponsor: ₹10,000+\n🥈 Silver Sponsor: ₹5,000+\n\nView tier details & register online: https://gp2026.luhurachati.com/sponsors`
                   )}`}
                   target="_blank"
                   rel="noreferrer"
