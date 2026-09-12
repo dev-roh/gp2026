@@ -12,9 +12,12 @@ export const createClient = (request: NextRequest) => {
     },
   });
 
+  const url = (supabaseUrl && !supabaseUrl.includes('[SENSITIVE]')) ? supabaseUrl : 'https://example.supabase.co';
+  const key = (supabaseKey && !supabaseKey.includes('[SENSITIVE]')) ? supabaseKey : 'mock-key';
+
   const supabase = createServerClient(
-    supabaseUrl!,
-    supabaseKey!,
+    url,
+    key,
     {
       cookies: {
         getAll() {

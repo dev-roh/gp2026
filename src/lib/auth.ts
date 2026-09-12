@@ -75,16 +75,25 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async redirect({ url, baseUrl }) {
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      const rawEnvUrl = process.env.NEXTAUTH_URL;
+      const validEnvUrl = (rawEnvUrl && !rawEnvUrl.includes('[SENSITIVE]')) ? rawEnvUrl : undefined;
+      const rawBaseUrl = (baseUrl && !baseUrl.includes('[SENSITIVE]')) ? baseUrl : undefined;
+      const safeBaseUrl = rawBaseUrl || validEnvUrl || 'https://gp2026.luhurachati.com';
+      if (url.startsWith("/")) return `${safeBaseUrl}${url}`;
       try {
+        if (!url || typeof url !== 'string' || url.includes('[SENSITIVE]')) return safeBaseUrl;
         const parsedUrl = new URL(url);
-        if (parsedUrl.origin === baseUrl || parsedUrl.origin === "https://www.luhurachati.com" || parsedUrl.origin === "https://luhurachati.com") {
+        let parsedBase: URL | null = null;
+        try { parsedBase = new URL(safeBaseUrl); } catch (e) {}
+
+        if (parsedBase && parsedUrl.origin === parsedBase.origin) return url;
+        if (parsedUrl.origin === "https://www.luhurachati.com" || parsedUrl.origin === "https://luhurachati.com") {
           return url;
         }
       } catch (e) {
-        // invalid url, fallback to baseUrl
+        // invalid url, fallback to safeBaseUrl
       }
-      return baseUrl;
+      return safeBaseUrl;
     },
   },
   secret: process.env.NEXTAUTH_SECRET || 'ganesh_puja_2026_super_secret_local_key',

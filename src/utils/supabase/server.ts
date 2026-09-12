@@ -5,9 +5,11 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export const createClient = (cookieStore: Awaited<ReturnType<typeof cookies>>) => {
+  const url = (supabaseUrl && !supabaseUrl.includes('[SENSITIVE]')) ? supabaseUrl : 'https://example.supabase.co';
+  const key = (supabaseKey && !supabaseKey.includes('[SENSITIVE]')) ? supabaseKey : 'mock-key';
   return createServerClient(
-    supabaseUrl!,
-    supabaseKey!,
+    url,
+    key,
     {
       cookies: {
         getAll() {

@@ -177,6 +177,8 @@ function ProgrammeMediaCard({ prog }: { prog: ProgrammeItem }) {
         <img 
           src={prog.photoUrl} 
           alt={prog.title} 
+          loading="lazy"
+          decoding="async"
           className="w-full h-auto max-h-96 object-contain mx-auto" 
         />
       </div>
@@ -192,7 +194,7 @@ function ProgrammeMediaCard({ prog }: { prog: ProgrammeItem }) {
         {!isPlaying ? (
           <div className="relative w-full h-full group cursor-pointer flex items-center justify-center bg-slate-900 overflow-hidden" onClick={() => setIsPlaying(true)}>
             {thumbnail ? (
-              <img src={thumbnail} alt={prog.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-300 opacity-80" />
+              <img src={thumbnail} alt={prog.title} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition duration-300 opacity-80" />
             ) : (
               <div className="absolute inset-0 bg-gradient-to-tr from-amber-900 via-orange-950 to-slate-950"></div>
             )}
@@ -409,6 +411,7 @@ export default function HomePage() {
   const [editUserForm, setEditUserForm] = useState({ userId: '', name: '', email: '', phone: '', area: '' });
   const [editUserMsg, setEditUserMsg] = useState('');
   const [isSubmittingEditUser, setIsSubmittingEditUser] = useState(false);
+  const [isSubmittingContribution, setIsSubmittingContribution] = useState(false);
 
   const handleOpenEditUser = (member: { id: string; name: string; area: string; email?: string; phone?: string }) => {
     setEditUserForm({
@@ -952,36 +955,43 @@ export default function HomePage() {
 
   const handleAddContribution = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contribForm.memberName || !contribForm.amount) return;
+    if (!contribForm.memberName || !contribForm.amount || isSubmittingContribution) return;
 
-    const res = await fetch('/api/finance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'ADD_CONTRIBUTION',
-        data: {
-          memberName: contribForm.memberName,
-          memberArea: contribForm.memberArea || 'General Area',
-          amount: parseFloat(contribForm.amount),
-          paymentMode: contribForm.paymentMode,
-          collectorId: session?.user?.email || 'usr-2',
-          collectorName: session?.user?.name || 'Collector',
-          note: contribForm.note,
-          isPrivate: contribForm.isPrivate
+    try {
+      setIsSubmittingContribution(true);
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'ADD_CONTRIBUTION',
+          data: {
+            memberName: contribForm.memberName,
+            memberArea: contribForm.memberArea || 'General Area',
+            amount: parseFloat(contribForm.amount),
+            paymentMode: contribForm.paymentMode,
+            collectorId: session?.user?.email || 'usr-2',
+            collectorName: session?.user?.name || 'Collector',
+            note: contribForm.note,
+            isPrivate: contribForm.isPrivate
+          }
+        })
+      });
+
+      const result = await res.json();
+      if (res.ok) {
+        setShowAddContribution(false);
+        setContribForm({ memberName: '', memberArea: '', amount: '', paymentMode: 'CASH', note: '', isPrivate: false });
+        fetchFinanceData();
+        if (result?.item) {
+          setSelectedReceipt(result.item);
         }
-      })
-    });
-
-    const result = await res.json();
-    if (res.ok) {
-      setShowAddContribution(false);
-      setContribForm({ memberName: '', memberArea: '', amount: '', paymentMode: 'CASH', note: '', isPrivate: false });
-      fetchFinanceData();
-      if (result?.item) {
-        setSelectedReceipt(result.item);
+      } else {
+        alert(result.error || 'Operation failed');
       }
-    } else {
-      alert(result.error || 'Operation failed');
+    } catch (err: any) {
+      alert(`Error submitting collection: ${err?.message || 'Network error'}`);
+    } finally {
+      setIsSubmittingContribution(false);
     }
   };
 
@@ -3003,8 +3013,28 @@ export default function HomePage() {
                 </label>
               </div>
               <div className="pt-2 flex gap-2">
-                <button type="button" onClick={() => setShowAddContribution(false)} className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 font-medium">Cancel</button>
-                <button type="submit" className="flex-1 py-2 rounded-lg bg-orange-600 text-white font-bold">Save Receipt</button>
+                <button 
+                  type="button" 
+                  onClick={() => setShowAddContribution(false)} 
+                  disabled={isSubmittingContribution}
+                  className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 font-medium disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isSubmittingContribution}
+                  className="flex-1 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold disabled:opacity-60 flex items-center justify-center space-x-2 transition"
+                >
+                  {isSubmittingContribution ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Saving Receipt...</span>
+                    </>
+                  ) : (
+                    <span>Save Receipt</span>
+                  )}
+                </button>
               </div>
             </form>
           </div>

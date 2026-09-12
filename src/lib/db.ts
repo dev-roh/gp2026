@@ -173,15 +173,25 @@ const SUPER_ADMIN_EMAIL = 'luhurenbaiclub@gmail.com';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SECRET_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const supabase = (supabaseUrl && supabaseKey) 
-  ? createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: {
-          apikey: supabaseKey,
+let supabaseClient = null;
+if (supabaseUrl && supabaseKey && !supabaseUrl.includes('[SENSITIVE]') && !supabaseKey.includes('[SENSITIVE]')) {
+  try {
+    const validUrl = new URL(supabaseUrl);
+    if (validUrl.protocol === 'http:' || validUrl.protocol === 'https:') {
+      supabaseClient = createClient(supabaseUrl, supabaseKey, {
+        global: {
+          headers: {
+            apikey: supabaseKey,
+          },
         },
-      },
-    })
-  : null;
+      });
+    }
+  } catch (e) {
+    console.error('Invalid Supabase URL provided:', supabaseUrl);
+  }
+}
+
+export const supabase = supabaseClient;
 
 const defaultSettings: AppSettings = {
   appTitle: 'Ganesh Puja - LBC',
@@ -238,13 +248,13 @@ export async function getDbAsync(): Promise<DatabaseSchema> {
         supabase.from('app_settings').select('*').single(),
         supabase.from('users').select('*'),
         supabase.from('role_assignments').select('*'),
-        supabase.from('contributions').select('*'),
-        supabase.from('expenses').select('*'),
-        supabase.from('handovers').select('*'),
-        supabase.from('collector_transfers').select('*'),
-        supabase.from('programmes').select('*'),
-        supabase.from('membership_requests').select('*'),
-        supabase.from('notifications').select('*'),
+        supabase.from('contributions').select('*').order('created_at', { ascending: false }),
+        supabase.from('expenses').select('*').order('created_at', { ascending: false }),
+        supabase.from('handovers').select('*').order('created_at', { ascending: false }),
+        supabase.from('collector_transfers').select('*').order('created_at', { ascending: false }),
+        supabase.from('programmes').select('*').order('date_time', { ascending: true }),
+        supabase.from('membership_requests').select('*').order('created_at', { ascending: false }),
+        supabase.from('notifications').select('*').order('date', { ascending: false }),
         supabase.from('user_activities').select('*').order('timestamp', { ascending: false }).limit(100)
       ]);
 

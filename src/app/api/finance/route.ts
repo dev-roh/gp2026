@@ -12,8 +12,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { searchParams } = new URL(req.url);
-  const format = searchParams.get('format');
+  let format: string | null = null;
+  try {
+    if (req?.url && typeof req.url === 'string' && !req.url.includes('[SENSITIVE]')) {
+      const { searchParams } = new URL(req.url, 'https://gp2026.luhurachati.com');
+      format = searchParams.get('format');
+    }
+  } catch (e) {}
+
   const db = await getDbAsync();
 
   if (format === 'csv') {
