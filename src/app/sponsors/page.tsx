@@ -183,6 +183,11 @@ export default function SponsorsPage() {
   const silverList = sponsors.filter(s => s.sponsorCategory === 'SILVER');
   const bronzeList = sponsors.filter(s => s.sponsorCategory === 'BRONZE');
 
+  const filteredList = sponsors.filter(s => {
+    if (selectedFilterCategory === 'ALL') return true;
+    return s.sponsorCategory === selectedFilterCategory;
+  });
+
   const packagesRef = React.useRef<HTMLDivElement>(null);
 
   const scrollToPackages = () => {
