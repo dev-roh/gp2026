@@ -8,10 +8,6 @@ export async function GET(req: Request) {
   const userEmail = session?.user?.email;
   const userRole = getUserRole(userEmail);
 
-  if (!userEmail) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   let format: string | null = null;
   try {
     if (req?.url && typeof req.url === 'string' && !req.url.includes('[SENSITIVE]')) {
@@ -21,6 +17,51 @@ export async function GET(req: Request) {
   } catch (e) {}
 
   const db = await getDbAsync();
+
+  // Public View for Unauthenticated Guests
+  if (!userEmail) {
+    const approvedContributions = db.contributions.filter(c => c.status === 'APPROVED');
+    const totalCollected = approvedContributions.reduce((acc, curr) => acc + curr.amount, 0);
+    const totalSpent = db.expenses.reduce((acc, curr) => acc + curr.amount, 0);
+
+    // Return public summary & public contributions (sponsorships or anonymized)
+    const publicContributions = approvedContributions.map(c => {
+      if (c.isSponsorship) {
+        return c; // Keep sponsor details public for Gratitude Wall
+      }
+      return {
+        ...c,
+        memberName: 'Anonymous / Confidential',
+        memberArea: 'Confidential Area',
+        note: c.note ? '*** Private Note ***' : undefined
+      };
+    });
+
+    return NextResponse.json({
+      settings: db.settings,
+      summary: {
+        totalCollected,
+        totalSpent,
+        netTreasuryBalance: totalCollected - totalSpent,
+        pendingHandovers: 0,
+        pendingReimbursements: 0,
+        targetGoal: db.settings?.targetGoalAmount || 200000
+      },
+      collectorBalances: [],
+      latestContributions: publicContributions.slice().reverse(),
+      pendingApprovalsForMe: [],
+      pendingCollectorTransfersForMe: [],
+      collectorTransfers: [],
+      totalPendingActionCount: 0,
+      notifications: [],
+      latestExpenses: db.expenses.slice().reverse(),
+      handovers: [],
+      programmes: (db.programmes || []).slice().reverse(),
+      membershipRequests: [],
+      users: [],
+      userActivities: []
+    });
+  }
 
   if (format === 'csv') {
     let csv = 'Type,ID,Date,Name/Title,Area/Category,Amount,PaymentMode/OutofPocket,Collector/PaidBy,Status,Notes\n';
