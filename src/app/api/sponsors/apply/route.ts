@@ -127,6 +127,7 @@ export async function POST(req: Request) {
       collectorId: userEmail,
       collectorName: contactPerson || userName,
       status: 'PENDING_SUPER_ADMIN_APPROVAL' as const,
+      isPrivate: true,
       isSponsorship: true,
       sponsorCategory: category || 'GOLD',
       sponsorLogoUrl: logoUrl || undefined,

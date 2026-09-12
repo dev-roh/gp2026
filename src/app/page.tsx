@@ -1122,6 +1122,7 @@ export default function HomePage() {
             collectorId: session?.user?.email || 'usr-2',
             collectorName: session?.user?.name || 'Collector',
             note: sponsorForm.notes || `Corporate Sponsor - Contact: ${sponsorForm.contactPerson || 'N/A'} (${sponsorForm.phone || 'N/A'})`,
+            isPrivate: true,
             isSponsorship: true,
             sponsorCategory: sponsorForm.category,
             sponsorLogoUrl: sponsorForm.logoUrl || undefined,
@@ -2132,7 +2133,6 @@ export default function HomePage() {
                                     </span>
                                   </div>
                                 </div>
-                                <span className="font-black text-emerald-400 text-base">₹{sp.amount.toLocaleString()}</span>
                               </div>
                               {sp.note && <p className="text-xs text-slate-300 font-medium italic">"{sp.note}"</p>}
                             </div>
