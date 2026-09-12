@@ -10,9 +10,11 @@ export async function middleware(req: NextRequest) {
 
   const { pathname } = req.nextUrl;
 
-  // Allow public landing page, NextAuth callbacks, static assets, and manifest files
+  // Allow public access to landing page, sponsors page, public GET sponsors API, NextAuth callbacks, static assets, and manifest files
   if (
     pathname === '/' ||
+    pathname === '/sponsors' ||
+    (pathname === '/api/sponsors/apply' && req.method === 'GET') ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/_next') ||
     pathname.includes('/favicon.ico') ||
