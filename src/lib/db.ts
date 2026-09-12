@@ -814,13 +814,13 @@ export function getUserRole(email: string | null | undefined): 'SUPER_ADMIN' | '
   return 'VIEW_ONLY';
 }
 
-export async function registerOrUpdateUserAsync(name: string, email: string, image?: string): Promise<User> {
+export async function registerOrUpdateUserAsync(name: string, email: string, image?: string, explicitRole?: 'SUPER_ADMIN' | 'TREASURER' | 'COLLECTOR' | 'MEMBER' | 'SPONSOR' | 'VIEW_ONLY'): Promise<User> {
   const db = await getDbAsync();
   const normalizedEmail = email.toLowerCase();
   let user = db.users.find(u => u.email.toLowerCase() === normalizedEmail);
 
   if (!user) {
-    const role = getUserRole(normalizedEmail);
+    const role = explicitRole || getUserRole(normalizedEmail);
     user = {
       id: `usr-${Date.now()}`,
       name,
