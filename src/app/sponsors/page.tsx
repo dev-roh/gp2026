@@ -183,10 +183,13 @@ export default function SponsorsPage() {
   const silverList = sponsors.filter(s => s.sponsorCategory === 'SILVER');
   const bronzeList = sponsors.filter(s => s.sponsorCategory === 'BRONZE');
 
-  const filteredList = sponsors.filter(s => {
-    if (selectedFilterCategory === 'ALL') return true;
-    return s.sponsorCategory === selectedFilterCategory;
-  });
+  const packagesRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollToPackages = () => {
+    if (packagesRef.current) {
+      packagesRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-amber-500/10 via-orange-500/5 to-slate-950 text-slate-100 pb-16 font-sans">
@@ -206,9 +209,9 @@ export default function SponsorsPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative px-4 py-12 sm:py-16 text-center overflow-hidden bg-slate-950">
+      <section className="relative px-4 py-10 sm:py-14 text-center overflow-hidden bg-slate-950 border-b border-slate-900">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-amber-500/20 via-orange-600/10 to-transparent pointer-events-none" />
-        <div className="max-w-4xl mx-auto space-y-5 relative z-10">
+        <div className="max-w-4xl mx-auto space-y-4 relative z-10">
           <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-400/30 text-amber-400 text-xs font-black uppercase tracking-widest shadow-sm">
             <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
             <span>Official Festival Sponsorship & Gratitude Deck</span>
@@ -219,23 +222,17 @@ export default function SponsorsPage() {
           </h1>
 
           <p className="text-sm sm:text-base text-slate-300 font-medium max-w-2xl mx-auto leading-relaxed">
-            Gain high-impact brand exposure across thousands of local & out-of-town festival patrons! Display your business logo on LED pandal screens, official digital PWA receipts, and map links.
+            Sponsors-First Philosophy: Celebrating local business leaders powering our community festival. Gain high-impact brand exposure across LED pandal screens, digital receipts, and map links!
           </p>
 
           {/* Action CTAs */}
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-3">
             <button
-              onClick={() => {
-                if (!session?.user?.email) {
-                  signIn('google');
-                } else {
-                  setShowApplyModal(true);
-                }
-              }}
+              onClick={scrollToPackages}
               className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 text-slate-950 font-black text-sm shadow-xl hover:scale-105 transition transform active:scale-95 flex items-center space-x-2 border border-amber-300/60"
             >
               <Award className="w-5 h-5 text-slate-950" />
-              <span>{session?.user?.email ? 'Become an Official Sponsor' : 'Sign in to Become a Sponsor'}</span>
+              <span>Become an Official Sponsor ↓</span>
             </button>
 
             <a
@@ -253,11 +250,144 @@ export default function SponsorsPage() {
         </div>
       </section>
 
-      {/* Tier Packages Showcase Grid */}
-      <section className="max-w-6xl mx-auto px-4 py-10 space-y-6">
+      {/* 1. DIGITAL WALL OF GRATITUDE GALLERY (Rendered First for Sponsors-First Philosophy) */}
+      <section className="max-w-6xl mx-auto px-4 py-10 space-y-6 border-b border-slate-900">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div>
+            <h2 className="text-2xl font-black text-amber-400 flex items-center gap-2">
+              <Heart className="w-6 h-6 text-rose-500 fill-current" />
+              <span>Digital Wall of Gratitude ({sponsors.length})</span>
+            </h2>
+            <p className="text-xs text-slate-400 font-medium">Honoring our corporate sponsors and local business patrons</p>
+          </div>
+
+          {/* Filter Segmented Controls */}
+          <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 text-xs font-bold">
+            {(['ALL', 'PLATINUM', 'GOLD', 'SILVER'] as const).map(cat => (
+              <button
+                key={cat}
+                onClick={() => setSelectedFilterCategory(cat)}
+                className={`px-3 py-1.5 rounded-xl transition ${
+                  selectedFilterCategory === cat ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {loadingSponsors ? (
+          <div className="text-center py-12 space-y-2">
+            <Loader2 className="w-8 h-8 text-amber-400 animate-spin mx-auto" />
+            <p className="text-xs text-slate-400 font-medium">Loading Wall of Gratitude...</p>
+          </div>
+        ) : filteredList.length === 0 ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-10 text-center space-y-3 max-w-lg mx-auto">
+            <Building2 className="w-12 h-12 text-amber-400/50 mx-auto" />
+            <h3 className="font-black text-slate-200 text-base">No sponsors published in this tier yet</h3>
+            <p className="text-xs text-slate-400 leading-relaxed font-medium">
+              Be the first business to claim sponsorship in this tier and showcase your logo to thousands of devotees!
+            </p>
+            <button
+              onClick={() => {
+                if (!session?.user?.email) signIn('google');
+                else setShowApplyModal(true);
+              }}
+              className="px-5 py-2.5 rounded-xl bg-amber-400 text-slate-950 text-xs font-black shadow-md hover:bg-amber-300 transition"
+            >
+              + Register Business Sponsor
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredList.map(s => (
+              <div
+                key={s.id}
+                className={`rounded-3xl p-6 shadow-xl space-y-4 flex flex-col justify-between border transition ${
+                  s.sponsorCategory === 'PLATINUM' ? 'bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-amber-400' :
+                  s.sponsorCategory === 'GOLD' ? 'bg-slate-900 border border-amber-400/50' :
+                  'bg-slate-900 border border-slate-800'
+                }`}
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center space-x-3">
+                      {s.sponsorLogoUrl ? (
+                        <img
+                          src={s.sponsorLogoUrl}
+                          alt={s.businessName}
+                          className="w-14 h-14 rounded-2xl object-cover border border-amber-400 shrink-0 bg-white p-0.5"
+                        />
+                      ) : (
+                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-400 to-orange-500 text-slate-950 font-black text-xl flex items-center justify-center shrink-0 shadow-md">
+                          {s.businessName.charAt(0)}
+                        </div>
+                      )}
+                      <div>
+                        <h3 className="font-black text-slate-100 text-base leading-tight">{s.businessName}</h3>
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md inline-block mt-1 ${
+                          s.sponsorCategory === 'PLATINUM' ? 'bg-amber-400 text-slate-950' :
+                          s.sponsorCategory === 'GOLD' ? 'bg-amber-200 text-amber-900' :
+                          'bg-slate-700 text-slate-200'
+                        }`}>
+                          {s.sponsorCategory || 'SPONSOR'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {s.note && (
+                    <p className="text-xs text-slate-300 font-medium italic bg-slate-950/50 p-3 rounded-2xl border border-slate-800">
+                      "{s.note.replace(/^\[Sponsor Note\]:\s*/, '')}"
+                    </p>
+                  )}
+                </div>
+
+                <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-slate-400">
+                  {s.sponsorWebsiteUrl && (
+                    <a
+                      href={s.sponsorWebsiteUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-amber-400 hover:underline flex items-center gap-1 font-bold"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Website</span>
+                    </a>
+                  )}
+                  {s.sponsorMapUrl && (
+                    <a
+                      href={s.sponsorMapUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-emerald-400 hover:underline flex items-center gap-1 font-bold"
+                    >
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span>Shop Map</span>
+                    </a>
+                  )}
+                  {s.sponsorPhone && (
+                    <a href={`tel:${s.sponsorPhone}`} className="text-slate-300 hover:underline flex items-center gap-1">
+                      <Phone className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{s.sponsorPhone}</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 2. SPONSORSHIP PACKAGES & PRIVILEGES (Scrolled To via CTA Button) */}
+      <section ref={packagesRef} className="max-w-6xl mx-auto px-4 py-10 space-y-6">
         <div className="text-center space-y-2">
+          <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-400 text-[10px] font-black uppercase tracking-widest">
+            <span>✨ Take Action & Join Our Festival Partners</span>
+          </div>
           <h2 className="text-2xl sm:text-3xl font-black text-amber-400">Sponsorship Packages & Privileges</h2>
-          <p className="text-xs sm:text-sm text-slate-400 font-medium">Choose a tier that aligns best with your business marketing goals</p>
+          <p className="text-xs sm:text-sm text-slate-400 font-medium">Select a tier below to register your business & display your brand logo</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -384,136 +514,6 @@ export default function SponsorsPage() {
             </button>
           </div>
         </div>
-      </section>
-
-      {/* Wall of Gratitude Gallery */}
-      <section className="max-w-6xl mx-auto px-4 py-10 space-y-6">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-800 pb-4">
-          <div>
-            <h2 className="text-2xl font-black text-amber-400 flex items-center gap-2">
-              <Heart className="w-6 h-6 text-rose-500 fill-current" />
-              <span>Digital Wall of Gratitude ({sponsors.length})</span>
-            </h2>
-            <p className="text-xs text-slate-400 font-medium">Recognizing our corporate sponsors and local business supporters</p>
-          </div>
-
-          {/* Filter Segmented Controls */}
-          <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 text-xs font-bold">
-            {(['ALL', 'PLATINUM', 'GOLD', 'SILVER'] as const).map(cat => (
-              <button
-                key={cat}
-                onClick={() => setSelectedFilterCategory(cat)}
-                className={`px-3 py-1.5 rounded-xl transition ${
-                  selectedFilterCategory === cat ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {loadingSponsors ? (
-          <div className="text-center py-12 space-y-2">
-            <Loader2 className="w-8 h-8 text-amber-400 animate-spin mx-auto" />
-            <p className="text-xs text-slate-400 font-medium">Loading Wall of Gratitude...</p>
-          </div>
-        ) : filteredList.length === 0 ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-10 text-center space-y-3 max-w-lg mx-auto">
-            <Building2 className="w-12 h-12 text-amber-400/50 mx-auto" />
-            <h3 className="font-black text-slate-200 text-base">No sponsors published in this tier yet</h3>
-            <p className="text-xs text-slate-400 leading-relaxed font-medium">
-              Be the first business to claim sponsorship in this tier and showcase your logo to thousands of devotees!
-            </p>
-            <button
-              onClick={() => {
-                if (!session?.user?.email) signIn('google');
-                else setShowApplyModal(true);
-              }}
-              className="px-5 py-2.5 rounded-xl bg-amber-400 text-slate-950 text-xs font-black shadow-md hover:bg-amber-300 transition"
-            >
-              + Register Business Sponsor
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredList.map(s => (
-              <div
-                key={s.id}
-                className={`rounded-3xl p-6 shadow-xl space-y-4 flex flex-col justify-between border transition ${
-                  s.sponsorCategory === 'PLATINUM' ? 'bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-amber-400' :
-                  s.sponsorCategory === 'GOLD' ? 'bg-slate-900 border border-amber-400/50' :
-                  'bg-slate-900 border border-slate-800'
-                }`}
-              >
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center space-x-3">
-                      {s.sponsorLogoUrl ? (
-                        <img
-                          src={s.sponsorLogoUrl}
-                          alt={s.businessName}
-                          className="w-14 h-14 rounded-2xl object-cover border border-amber-400 shrink-0 bg-white p-0.5"
-                        />
-                      ) : (
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-400 to-orange-500 text-slate-950 font-black text-xl flex items-center justify-center shrink-0 shadow-md">
-                          {s.businessName.charAt(0)}
-                        </div>
-                      )}
-                      <div>
-                        <h3 className="font-black text-slate-100 text-base leading-tight">{s.businessName}</h3>
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md inline-block mt-1 ${
-                          s.sponsorCategory === 'PLATINUM' ? 'bg-amber-400 text-slate-950' :
-                          s.sponsorCategory === 'GOLD' ? 'bg-amber-200 text-amber-900' :
-                          'bg-slate-700 text-slate-200'
-                        }`}>
-                          {s.sponsorCategory || 'SPONSOR'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {s.note && (
-                    <p className="text-xs text-slate-300 font-medium italic bg-slate-950/50 p-3 rounded-2xl border border-slate-800">
-                      "{s.note.replace(/^\[Sponsor Note\]:\s*/, '')}"
-                    </p>
-                  )}
-                </div>
-
-                <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-slate-400">
-                  {s.sponsorWebsiteUrl && (
-                    <a
-                      href={s.sponsorWebsiteUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-amber-400 hover:underline flex items-center gap-1 font-bold"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Website</span>
-                    </a>
-                  )}
-                  {s.sponsorMapUrl && (
-                    <a
-                      href={s.sponsorMapUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-emerald-400 hover:underline flex items-center gap-1 font-bold"
-                    >
-                      <MapPin className="w-3.5 h-3.5" />
-                      <span>Shop Map</span>
-                    </a>
-                  )}
-                  {s.sponsorPhone && (
-                    <a href={`tel:${s.sponsorPhone}`} className="text-slate-300 hover:underline flex items-center gap-1">
-                      <Phone className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{s.sponsorPhone}</span>
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </section>
 
       {/* BECOME A SPONSOR MODAL (Google Auth Gated + Strict File Validation) */}
