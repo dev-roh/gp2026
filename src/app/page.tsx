@@ -29,7 +29,8 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
-  MoreVertical
+  MoreVertical,
+  Loader2
 } from 'lucide-react';
 import { AppSettings, User as DbUser, ProgrammeItem } from '@/lib/db';
 
@@ -427,6 +428,22 @@ export default function HomePage() {
   const [sortExpenseOrder, setSortExpenseOrder] = useState<'asc' | 'desc'>('desc');
   const [expensePage, setExpensePage] = useState(1);
 
+  // Global Toast & Notification Banner State
+  const [appToast, setAppToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  // Global Modal Confirmation State
+  const [appConfirm, setAppConfirm] = useState<{
+    title: string;
+    message: string;
+    confirmText?: string;
+    isDanger?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setAppToast({ message, type });
+  };
+
   // Edit User details state
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [editUserForm, setEditUserForm] = useState({ userId: '', name: '', email: '', phone: '', area: '' });
@@ -482,33 +499,37 @@ export default function HomePage() {
     }
   };
 
-  const handleDeleteUser = async (member: { id: string; name: string; email?: string }) => {
-    if (!confirm(`Are you sure you want to permanently delete member "${member.name}"?`)) {
-      return;
-    }
+  const handleDeleteUser = (member: { id: string; name: string; email?: string }) => {
+    setAppConfirm({
+      title: 'Delete Member Account',
+      message: `Are you sure you want to permanently delete member "${member.name}"? This action cannot be undone.`,
+      confirmText: 'Delete Member',
+      isDanger: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch('/api/admin/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'DELETE_USER',
+              userId: member.id,
+              email: member.email
+            })
+          });
 
-    try {
-      const res = await fetch('/api/admin/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'DELETE_USER',
-          userId: member.id,
-          email: member.email
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        alert(`✅ ${data.message || 'User deleted successfully.'}`);
-        fetchMembersDirectory();
-        fetchFinanceData();
-      } else {
-        alert(`Error: ${data.error || 'Failed to delete user'}`);
+          const data = await res.json();
+          if (res.ok) {
+            showToast(data.message || 'User deleted successfully.', 'success');
+            fetchMembersDirectory();
+            fetchFinanceData();
+          } else {
+            showToast(data.error || 'Failed to delete user', 'error');
+          }
+        } catch (err) {
+          showToast('Error sending delete request', 'error');
+        }
       }
-    } catch (err) {
-      alert('Error sending delete request');
-    }
+    });
   };
 
   const fetchMembersDirectory = async () => {
@@ -549,27 +570,32 @@ export default function HomePage() {
     }
   };
 
-  const handleMergeCollectionUser = async (collectionName: string, targetUserEmail: string) => {
-    if (!confirm(`Merge all collection records of "${collectionName}" under user account ${targetUserEmail}?`)) return;
+  const handleMergeCollectionUser = (collectionName: string, targetUserEmail: string) => {
+    setAppConfirm({
+      title: 'Merge Field Collection Entity',
+      message: `Merge all collection records of "${collectionName}" under user account ${targetUserEmail}?`,
+      confirmText: 'Merge Account',
+      onConfirm: async () => {
+        const res = await fetch('/api/admin/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'MERGE_COLLECTION_USER',
+            collectionName,
+            targetUserEmail
+          })
+        });
 
-    const res = await fetch('/api/admin/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'MERGE_COLLECTION_USER',
-        collectionName,
-        targetUserEmail
-      })
+        const data = await res.json();
+        if (res.ok) {
+          showToast(data.message, 'success');
+          fetchMembersDirectory();
+          fetchFinanceData();
+        } else {
+          showToast(data.error || 'Failed to merge user', 'error');
+        }
+      }
     });
-
-    const data = await res.json();
-    if (res.ok) {
-      alert(`✅ ${data.message}`);
-      fetchMembersDirectory();
-      fetchFinanceData();
-    } else {
-      alert(`Error: ${data.error || 'Failed to merge user'}`);
-    }
   };
 
   const [selectedContributionIds, setSelectedContributionIds] = useState<string[]>([]);
@@ -595,7 +621,7 @@ export default function HomePage() {
   const handleConfirmDeleteContributions = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!deleteReason || !deleteReason.trim()) {
-      alert('A mandatory reason is required to delete contribution(s).');
+      showToast('A mandatory reason is required to delete contribution(s).', 'error');
       return;
     }
 
@@ -621,17 +647,17 @@ export default function HomePage() {
 
       const result = await res.json();
       if (res.ok) {
-        alert(`✅ ${result.message}`);
+        showToast(result.message, 'success');
         setShowDeleteModal(false);
         setDeleteTargetContribution(null);
         setSelectedContributionIds([]);
         setDeleteReason('');
         fetchFinanceData();
       } else {
-        alert(`Error: ${result.error || 'Failed to delete contribution(s)'}`);
+        showToast(result.error || 'Failed to delete contribution(s)', 'error');
       }
     } catch (err: any) {
-      alert(`Error: ${err.message || 'Failed to delete contribution(s)'}`);
+      showToast(err.message || 'Failed to delete contribution(s)', 'error');
     } finally {
       setIsDeleting(false);
     }
@@ -821,19 +847,30 @@ export default function HomePage() {
     }
   };
 
-  const handleDeleteProgramme = async (programmeId: string) => {
-    if (!confirm('Are you sure you want to remove this festival programme?')) return;
-    const res = await fetch('/api/finance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'DELETE_PROGRAMME',
-        data: { programmeId }
-      })
+  const handleDeleteProgramme = (programmeId: string) => {
+    setAppConfirm({
+      title: 'Remove Activity',
+      message: 'Are you sure you want to remove this festival programme from the public schedule?',
+      confirmText: 'Remove Event',
+      isDanger: true,
+      onConfirm: async () => {
+        const res = await fetch('/api/finance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'DELETE_PROGRAMME',
+            data: { programmeId }
+          })
+        });
+        const result = await res.json();
+        if (res.ok) {
+          showToast('Festival activity removed successfully', 'success');
+          fetchFinanceData();
+        } else {
+          showToast(result.error || 'Failed to remove activity', 'error');
+        }
+      }
     });
-    const result = await res.json();
-    if (res.ok) fetchFinanceData();
-    else alert(result.error);
   };
 
   const fetchRoleAssignments = async () => {
@@ -1067,7 +1104,7 @@ export default function HomePage() {
       setExpenseForm({ title: '', category: 'General', amount: '', isOutofPocket: true });
       fetchFinanceData();
     } else {
-      alert(result.error || 'Operation failed');
+      showToast(result.error || 'Operation failed', 'error');
     }
   };
 
@@ -1079,7 +1116,7 @@ export default function HomePage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        type: 'REQUEST_HANDOVER',
+        type: 'LOG_HANDOVER',
         data: {
           collectorId: session?.user?.email || 'usr-2',
           collectorName: session?.user?.name || 'Collector',
@@ -1099,7 +1136,7 @@ export default function HomePage() {
         setSelectedHandover(result.item);
       }
     } else {
-      alert(result.error || 'Operation failed');
+      showToast(result.error || 'Operation failed', 'error');
     }
   };
 
@@ -1113,44 +1150,53 @@ export default function HomePage() {
       })
     });
     const result = await res.json();
-    if (res.ok) fetchFinanceData();
-    else alert(result.error);
+    if (res.ok) {
+      showToast('Handover approved successfully!', 'success');
+      fetchFinanceData();
+    } else {
+      showToast(result.error || 'Failed to approve handover', 'error');
+    }
   };
 
   const handleSettleReimbursement = async (expenseId: string) => {
-    const mode = prompt('Enter payment settlement mode (CASH or UPI):', 'UPI')?.toUpperCase();
-    if (!mode || (mode !== 'CASH' && mode !== 'UPI')) return;
-
     const res = await fetch('/api/finance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type: 'SETTLE_REIMBURSEMENT',
-        data: { expenseId, settlementMode: mode }
+        data: { expenseId, settlementMode: 'UPI' }
       })
     });
     const result = await res.json();
-    if (res.ok) fetchFinanceData();
-    else alert(result.error);
+    if (res.ok) {
+      showToast('Reimbursement settled successfully!', 'success');
+      fetchFinanceData();
+    } else {
+      showToast(result.error || 'Failed to settle reimbursement', 'error');
+    }
   };
 
-  const handleResetDatabase = async () => {
-    if (!confirm('Are you sure you want to delete ALL test contributions, expenses, handovers, and reset the application for a fresh start? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/admin/roles', { method: 'DELETE' });
-      const result = await res.json();
-      if (res.ok) {
-        alert('Database successfully reset for a fresh start!');
-        fetchFinanceData();
-      } else {
-        alert(result.error || 'Failed to reset database.');
+  const handleResetDatabase = () => {
+    setAppConfirm({
+      title: 'Reset Database Vault',
+      message: 'Are you sure you want to delete ALL test contributions, expenses, handovers, and reset the application for a fresh start? This action cannot be undone.',
+      confirmText: 'Reset Application',
+      isDanger: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch('/api/admin/roles', { method: 'DELETE' });
+          const result = await res.json();
+          if (res.ok) {
+            showToast('Database successfully reset for a fresh start!', 'success');
+            fetchFinanceData();
+          } else {
+            showToast(result.error || 'Failed to reset database.', 'error');
+          }
+        } catch (err: any) {
+          showToast(err.message || 'Error occurred while resetting database.', 'error');
+        }
       }
-    } catch (err: any) {
-      alert(err.message || 'Error occurred while resetting database.');
-    }
+    });
   };
 
   const generateWhatsAppShare = (c: Contribution) => {
@@ -3841,13 +3887,87 @@ export default function HomePage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-rose-600 text-white font-extrabold shadow-sm hover:bg-rose-700 transition disabled:opacity-50"
+                  className="flex-1 py-2.5 rounded-xl bg-rose-600 text-white font-extrabold shadow-sm hover:bg-rose-700 transition disabled:opacity-50 flex items-center justify-center space-x-1.5"
                   disabled={isDeleting || !deleteReason.trim()}
                 >
-                  {isDeleting ? 'Deleting...' : 'Confirm Delete'}
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Deleting Record...</span>
+                    </>
+                  ) : (
+                    <span>Confirm Delete</span>
+                  )}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* STANDARD APP CONFIRMATION MODAL TEMPLATE */}
+      {appConfirm && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center space-x-2 border-b border-slate-100 pb-3">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${appConfirm.isDanger ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
+                {appConfirm.isDanger ? <Trash2 className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
+              </div>
+              <h3 className="font-extrabold text-slate-900 text-sm">{appConfirm.title}</h3>
+            </div>
+
+            <p className="text-xs text-slate-600 font-medium leading-relaxed">
+              {appConfirm.message}
+            </p>
+
+            <div className="pt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setAppConfirm(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const action = appConfirm.onConfirm;
+                  setAppConfirm(null);
+                  action();
+                }}
+                className={`flex-1 py-2.5 rounded-xl text-white font-extrabold text-xs shadow-sm transition ${
+                  appConfirm.isDanger
+                    ? 'bg-rose-600 hover:bg-rose-700'
+                    : 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600'
+                }`}
+              >
+                {appConfirm.confirmText || 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STANDARD APP TOAST BANNER TEMPLATE */}
+      {appToast && (
+        <div className="fixed bottom-5 right-5 z-50 animate-in slide-in-from-bottom-5 fade-in duration-200 max-w-xs w-full">
+          <div className={`p-4 rounded-2xl shadow-2xl border flex items-center justify-between text-xs font-bold text-white ${
+            appToast.type === 'success' ? 'bg-emerald-800 border-emerald-600' :
+            appToast.type === 'error' ? 'bg-rose-800 border-rose-600' :
+            'bg-slate-900 border-slate-700'
+          }`}>
+            <div className="flex items-center space-x-2">
+              {appToast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-300" />}
+              {appToast.type === 'error' && <Trash2 className="w-4 h-4 text-rose-300" />}
+              {appToast.type === 'info' && <Bell className="w-4 h-4 text-amber-300" />}
+              <span>{appToast.message}</span>
+            </div>
+            <button 
+              onClick={() => setAppToast(null)} 
+              className="ml-3 text-white/80 hover:text-white font-bold p-1"
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}
