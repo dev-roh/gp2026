@@ -1740,7 +1740,72 @@ export default function HomePage() {
       {/* TAB CONTENT: Overview */}
       {activeTab === 'overview' && (
         <div className="space-y-4">
+          {/* Featured Sponsors Wall & Banner on Homepage Overview */}
+          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 rounded-3xl p-5 shadow-lg space-y-3 relative overflow-hidden">
+            <div className="flex justify-between items-start">
+              <div className="space-y-1 max-w-xl">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black tracking-widest uppercase bg-slate-950 text-amber-400 px-3 py-1 rounded-full inline-block shadow-sm">
+                    ✨ Featured Corporate Sponsors & Partners
+                  </span>
+                  <button 
+                    onClick={() => setActiveTab('sponsors')} 
+                    className="text-[10px] font-extrabold underline text-slate-950 hover:text-white"
+                  >
+                    View All Tiers & Deck →
+                  </button>
+                </div>
+                <h2 className="text-lg sm:text-xl font-black text-slate-950 leading-tight">
+                  Empowering Community Celebrations Together
+                </h2>
+                <p className="text-xs font-semibold text-slate-900 leading-relaxed">
+                  Special thanks to local business leaders and corporate patrons powering Ganesh Puja 2026.
+                </p>
+              </div>
+              <div className="text-3xl hidden sm:block shrink-0">🚩🪔</div>
+            </div>
+
+            {/* Live Sponsor Spotlight Chips */}
+            {contributions.filter(c => c.isSponsorship && c.status === 'APPROVED').length > 0 ? (
+              <div className="pt-2 border-t border-slate-950/20">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-950 mb-2">Our Official Festival Partners:</p>
+                <div className="flex flex-wrap gap-2">
+                  {contributions.filter(c => c.isSponsorship && c.status === 'APPROVED').map((sp) => (
+                    <div key={sp.id} className="bg-slate-950 text-white px-3 py-1.5 rounded-2xl flex items-center gap-2 text-xs font-bold shadow-xs">
+                      {sp.sponsorLogoUrl ? (
+                        <img src={sp.sponsorLogoUrl} alt={sp.memberName} className="w-5 h-5 rounded-full object-cover border border-amber-400 shrink-0" />
+                      ) : (
+                        <span className="w-5 h-5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black flex items-center justify-center">
+                          {sp.memberName.charAt(0)}
+                        </span>
+                      )}
+                      <span>{sp.memberName}</span>
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded-md font-black ${
+                        sp.sponsorCategory === 'PLATINUM' ? 'bg-amber-400 text-slate-950' :
+                        sp.sponsorCategory === 'GOLD' ? 'bg-amber-200 text-amber-900' :
+                        'bg-slate-700 text-slate-200'
+                      }`}>
+                        {sp.sponsorCategory || 'SPONSOR'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="pt-2 border-t border-slate-950/20 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-bold text-slate-900">Be our lead Platinum, Gold, or Silver Sponsor!</span>
+                <button
+                  onClick={() => setShowAddSponsorModal(true)}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-950 text-amber-400 text-xs font-black shadow-md hover:bg-slate-900 transition"
+                >
+                  + Register Business Sponsor
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
             <div className="bg-amber-500/10 border border-amber-300 p-4 rounded-3xl shadow-xs">
               <div className="flex items-center text-amber-800 text-xs font-bold mb-1">
                 <Clock className="w-3.5 h-3.5 mr-1 text-amber-600" />
